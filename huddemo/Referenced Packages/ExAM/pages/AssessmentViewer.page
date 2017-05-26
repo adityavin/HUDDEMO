@@ -1,0 +1,2609 @@
+<apex:page controller="ExAM.AssessmentViewerController" sidebar="false" cache="false" standardStylesheets="false" docType="html-5.0">
+    <c:remoetk ></c:remoetk>    
+    <apex:includeScript value="{!URLFOR($Resource.ExAM__Datepicker,'Datepicker/jquery-1.10.2.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.ExAM__Datepicker,'Datepicker/jquery-ui.min.js')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.ExAM__Datepicker,'Datepicker/jquery-ui.min.css')}"/>
+    <!--<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"/>-->
+    <apex:includeScript value="{!URLFOR($Resource.ExAM__UnderscoreAndAngularJS,'UnderscoreAndAngularJS/angular.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.ExAM__UnderscoreAndAngularJS,'UnderscoreAndAngularJS/underscore-min.js')}"/>
+    <apex:includeScript value="{!$Resource.ExAM__sanitize}"/>
+    <apex:includeScript value="{!$Resource.ExAM__JSSignaturePad}"/>
+    <apex:includeScript value="{!$Resource.ExAM__hilightHotspot}"/>
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <head>
+            <title>Assessment Viewer</title>
+            <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
+            <apex:stylesheet value="{!URLFOR($Resource.ExAM__SLDS052, '/assets/styles/salesforce-lightning-design-system-vf.css')}" />
+        </head>
+    
+        
+        
+        <script type="text/javascript">
+            var __sfdcSessionId = '{!GETSESSIONID()}';
+        </script>
+        
+        <script src="../../soap/ajax/35.0/connection.js" type="text/javascript"></script>
+        <script src="../../soap/ajax/35.0/apex.js" type="text/javascript"></script>
+        <apex:includeScript value="{!$Resource.ExAM__svgxuse}"/>
+        <style>
+        
+            .slds .slds-tabs--scoped .slds-active > a {
+                background-color: white;
+                color: #0070d2;
+                border-color: #d8dde6; 
+            }
+            .slds .slds-tabs--scoped .slds-active > a:focus {
+                text-decoration: underline; 
+            }
+            .vfHelpText {
+                text-decoration: none;
+                position: absolute;
+                display: none;
+                width: 15em;
+                z-index: 12;
+                background-color: #fefdb9;
+                padding: 2px 5px;
+                border: 1px solid orange;
+                text-align: left;
+                white-space: normal;
+                font-weight: normal;
+                color: #000;
+            }
+            .imgStyle {
+                height: 25px !important;
+            }
+            .dependentQuestDivStyle {
+                margin-left: 1%;
+            }
+            .slds-radio {
+                display: block !important;
+            }
+       </style>
+        <script>
+            var underscore = angular.module('underscore', []);
+            underscore.factory('_', ['$window', function($window) {
+                return $window._; // assumes underscore has already been loaded on the page
+            }]);
+            var app = angular.module('viewerApp', ['underscore','ngSanitize']);
+            app.directive('file', function(){
+                
+                return {
+                    scope: {
+                        file: '='
+                    },
+                    link: function(scope, el, attrs){
+                        el.bind('change', function(event){
+                            var files = event.target.files;
+                            var file = files[0];
+                            var reader = new FileReader();
+                            reader.onload = loaded;
+                            reader.onerror = errorHandler;
+                            reader.readAsDataURL(file);
+                            
+                            function loaded(evt){
+                                scope.file = {};
+                                var fileContent = String(evt.target.result);
+                                fileContent = fileContent.substr(fileContent.indexOf(',') + 1);
+                                
+                                scope.file.resultbody = fileContent ;
+                                scope.file.name = file ? file.name : undefined;
+                                scope.file.contenttype = file ? file.type : undefined;
+                                
+                                scope.$apply(); 
+                                console.log(scope.file);
+                            }
+                            
+                            function errorHandler(evt) {
+                                if (evt.target.error.name == 'NotReadableError') {
+                                    alert('File could not be read');
+                                }
+                                else {
+                                    alert(evt.target.error);
+                                }
+                            }
+                        });
+                    }
+                };
+            });
+            
+            app.service('mainappservice', function($q,_) {
+
+                this.fetchAllAnswerRecords = function() {
+    
+                    var defer = $q.defer();
+                    ExAM.DataManagementController.queryAllAnswerRecords('{!$CurrentPage.parameters.amid}', false, function(result, event) {
+        
+                        if (event.status) {
+                            var ans = JSON.parse( _.unescape(result) );
+                            if (ans["errType"] && ans["errMsg"]) {
+                                defer.reject( ans );
+                            }
+                            else {
+                                defer.resolve(ans);
+                            }
+                        }
+                    }, function(error) {
+                        defer.reject(error);
+                    });
+                    return defer.promise;
+                }
+
+                this.fetchAllManagerRecords = function() {
+    
+                    var defer = $q.defer();
+                    ExAM.AssignmentManagerListController.queryAllASMRecords(function(result, event) {
+        
+                        if (event.status) {
+    
+                            defer.resolve(JSON.parse(_.unescape(result)));
+                        }
+                    }, function(error) {
+                        defer.reject(error);
+                    });
+                    return defer.promise;
+                }
+
+                //Added on 14-06-2016 to make the compiler wait until Decision Tree Answers save is done successfully
+                this.saveDecisionTreeAnswersInBackEnd = function(answersList) {
+
+                    var defer = $q.defer();
+
+                    ExAM.AssessmentViewerController.saveDecisionTreeAnswerRecords(answersList, function(result, event) {
+                        if (event.status) {
+                            if (result != null && result != '') {
+                                defer.resolve(JSON.parse(_.unescape(result)));
+                            }
+                        }
+                    }, function(error) {
+                        defer.reject(error);
+                    });
+                    return defer.promise;
+                }
+
+                /** 
+                    Added on 23-06-2016 for Implementing Dependent Questions Functionality
+                    Dependent Questions Functionality Starts
+                **/
+                this.queryDependentQuestions = function(assessmentTemplateId) {
+
+                    var defer = $q.defer();
+                    var client = new remotetk.Client();
+                    var imageTypeQuestionIdArr = [];
+                    var dependentQuestionsObj = {};
+                    var queryResultObj = {};
+
+                    var select_clause = "ExAM__Decision_Tree__c, ExAM__Dependent_Question__c, ExAM__HelpText__c, Id, ExAM__Is_Dependent__c, ExAM__Is_Mandatory__c, Name, ExAM__Next_Question__c, ExAM__Question_Label__c, ExAM__Question_Order_No__c, ExAM__Question_Type__c, ExAM__Section_Question__c, ExAM__Section_Question__r.ExAM__Questionnaire_Section__c, ExAM__Subquestion_Label__c, ExAM__Weight_of_Answer__c, ExAM__Field_Length__c";
+                    var from_clause = "ExAM__Question_Template__c";
+                    var where_clause =  "ExAM__Section_Question__r.ExAM__Questionnaire_Section__c = \'"+assessmentTemplateId+"\' AND (ExAM__Is_Dependent__c = true OR (ExAM__Is_Dependent__c = false AND ExAM__Question_Type__c = 'Image'))";
+                    var order_by_clause = "ExAM__Question_Order_No__c ASC";
+
+                    var soql_query_str1 = "SELECT "+select_clause+" FROM "+from_clause+" WHERE "+where_clause+" ORDER BY "+order_by_clause;
+
+                    client.query(soql_query_str1, function(dependentQuestions){
+
+                        var dependentQuestionsArr = dependentQuestions.records;
+                        for (i = 0; i < dependentQuestionsArr.length; i++) { 
+
+                            if (dependentQuestionsArr[i].ExAM__Is_Dependent__c) {
+                                dependentQuestionsObj[dependentQuestionsArr[i].Name] = dependentQuestionsArr[i];
+                            }
+                            if (dependentQuestionsArr[i].ExAM__Question_Type__c == 'Image') {
+                                var qTempId = '\'' + dependentQuestionsArr[i].Id + '\'';
+                                imageTypeQuestionIdArr.push( qTempId );
+                            }
+                        }
+                        queryResultObj.dependentQuestionsObj = dependentQuestionsObj
+                        queryResultObj.attachmentIds = imageTypeQuestionIdArr;
+                        defer.resolve( queryResultObj );
+
+                    }, function(error) {
+                        defer.reject(error);
+                    });
+                    return defer.promise;
+                }
+
+                this.queryImageQuestionTypeAttachments = function(questionTemplateIds) {
+
+                    var defer = $q.defer();
+                    var client = new remotetk.Client();
+                    var attachmentArr = {};
+
+                    var select_clause = "ContentType, Id, Name, ParentId";
+                    var from_clause = "Attachment";
+                    var where_clause =  "ParentId IN ("+questionTemplateIds+")";
+                    var order_by_clause = "Name ASC";
+
+                    var soql_query_str2 = "SELECT "+select_clause+" FROM "+from_clause+" WHERE "+where_clause+" ORDER BY "+order_by_clause;
+
+                    client.query(soql_query_str2, function(queriedAtts){
+
+                        var atts = queriedAtts.records;
+
+                        for(var a=0;a<atts.length;a++) {
+
+                            if ( !isNaN(atts[a].Name) ) {
+                                var attachmentObj = {};
+                                attachmentObj["recId"] = atts[a].Id;
+                                attachmentObj["parentId"] = atts[a].ParentId;
+                                attachmentObj["url"] = '/servlet/servlet.FileDownload?file='+atts[a].Id;
+                                attachmentObj["label"] = atts[a].Name;
+                                if (!attachmentArr[ atts[a].ParentId ]) {
+                                    attachmentArr[ atts[a].ParentId ] = [];
+                                }
+                                attachmentArr[ atts[a].ParentId ].push( attachmentObj );
+                            }
+                        }
+                        defer.resolve( attachmentArr );
+
+                    },function(error) {
+                        defer.reject(error);
+                    });
+                    return defer.promise;
+                }
+                /** Dependent Questions Functionality Ends **/
+
+                /*this.hasAnswerRecords = function(currentAssignmentmanagerIdVal) {
+                    var defer = $q.defer();
+                    var client = new remotetk.Client();
+                    var answerListVal = [];
+                    var answerRecordResponse = {};
+                    answerRecordResponse.hasAnswer = false;
+                    client.query("SELECT Id, Name, ExAM__Issue_Request__c "+
+                                " FROM ExAM__Questionnaire_Response__c "+
+                                " WHERE ExAM__Issue_Request__c = \'"+currentAssignmentmanagerIdVal+"\'"+
+                                " LIMIT 1", function(responseQuery){
+
+                        answerListVal = responseQuery.records;
+                        if (answerListVal != null && answerListVal.length > 0) {
+                            answerRecordResponse.hasAnswer = true;
+                        }                   
+                        defer.resolve( answerRecordResponse);
+                    }, function(error) {
+                        console.log(error);
+                    });
+                    return defer.promise;
+                }*/
+            });
+            app.controller('viewerCtrl', function($scope, filterFilter, mainappservice,_,$timeout) {
+                
+               $("#dropdownListId").hide();  // large screens here 
+                var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                if ($(window).width() < 490 || isMobile) {
+                    $("#tabId").hide();
+                    $("#tabId").parent('div').removeClass('slds-tabs--scoped');
+                    $("#dropdownListId").show();
+                    $("#secTemplateId").css("width","150px");
+
+                } else {
+                     $("#dropdownListId").hide();
+                     $("#tabId").show();
+                     $("#tabId").parent('div').addClass('slds-tabs--scoped');
+                }  
+                $(window).resize(function(){
+                                                            
+                    $scope.$apply(function(){
+                       if ($(window).width() < 420 || isMobile) {
+                            $("#tabId").hide();
+                            $("#tabId").parent('div').removeClass('slds-tabs--scoped');
+                            $("#dropdownListId").show();
+                            $("#secTemplateId").css("width","150px");
+        
+                        } else {
+                            $("#dropdownListId").hide();
+                            $("#tabId").show();
+                            $("#tabId").parent('div').addClass('slds-tabs--scoped');
+                        }  
+                    });
+                });
+                            
+                $scope.editAnswerObj = true;
+                $scope.response = {};
+                $scope.comment = {};
+                $scope.config = {};
+                $scope.photo = {};
+                $scope.signImage = {};
+                $scope.sections = [];
+                var signature;
+                $scope.signAnsOption = '';
+                $scope.ansFileId = '';
+                $scope.ansFileOption = '';
+
+                if ('{!JSENCODE(sectionTemplateListJSON)}' != null && '{!JSENCODE(sectionTemplateListJSON)}' != '' && '{!JSENCODE(sectionTemplateListJSON)}' != 'null') {
+                    $scope.sections = JSON.parse('{!JSENCODE(sectionTemplateListJSON)}');
+                }
+
+                $scope.sectionselectedvalue = ($scope.sections != null && $scope.sections.length > 0) ? $scope.sections[0].Id : '';
+                $scope.assignmentmanagerId = '{!assignmentId}';
+                $scope.assignmentaccountValue = '{!assignmentAccVal}';
+                $scope.templateIdValue = '{!templateId}';    
+                
+                $scope.configId = {};
+                $scope.newConfigName = '';     
+                
+                $scope.photoQuestionId = '';   
+                
+                $scope.showedquestion = '';
+                
+                $scope.bannershow = '{!bannerId}';
+                $scope.decisionTreeStartQuestionId = '';
+                $scope.questions = [];
+                if ('{!JSENCODE(questionTemplateClassListJSON)}' != null && '{!JSENCODE(questionTemplateClassListJSON)}' != '' && '{!JSENCODE(questionTemplateClassListJSON)}' != 'null') {
+                    var arrayOfQuestions = JSON.parse('{!JSENCODE(questionTemplateClassListJSON)}');
+                    $scope.caseQuestionArray = [];
+                    if (arrayOfQuestions != null && arrayOfQuestions.length > 0) {
+                        for (var questCount = 0; questCount < arrayOfQuestions.length; questCount++ ) {
+                            if (arrayOfQuestions[questCount] != null && arrayOfQuestions[questCount].questionTemplate != null ) {
+                                if (arrayOfQuestions[questCount].questionTemplate.ExAM__Question_Type__c != 'Case') {
+                                    $scope.questions.push(arrayOfQuestions[questCount]);
+                                } else {
+                                    $scope.caseQuestionArray.push(arrayOfQuestions[questCount]);
+                                }
+                            }
+                        }
+                        if ($scope.caseQuestionArray != null && $scope.caseQuestionArray.length > 0) {
+                            for (var caseQuestionCount = 0; caseQuestionCount < $scope.caseQuestionArray.length; caseQuestionCount++) {
+                                $scope.questions.push($scope.caseQuestionArray[caseQuestionCount]); 
+                            } 
+                        }
+                        //$scope.questions = _.extend($scope.caseQuestionArray, $scope.questions);
+                        //angular.extend($scope.questions,$scope.caseQuestionArray);
+                    }
+                    //$scope.questions = JSON.parse('{!JSENCODE(questionTemplateClassListJSON)}');
+                }
+                $scope.questionsTemp = [];
+                $scope.showSingleQuestion = false;
+                $scope.isSelectBtnOptn = {};
+                
+                $scope.hierarchicalObj = [];
+                if ('{!JSENCODE(hierarchicalListJSON)}' != null && '{!JSENCODE(hierarchicalListJSON)}' != '' && '{!JSENCODE(hierarchicalListJSON)}' != 'null') {
+                    $scope.hierarchicalObj = JSON.parse('{!JSENCODE(hierarchicalListJSON)}');
+                }
+                $scope.hierarchicalIdwithNames = [];
+                $scope.hierarchicalrecordNames = [];
+                $scope.hierarchicalrecordIds = [];
+                                
+                $scope.showHierarchical = false;
+                $scope.showDataManagement = false;
+                $scope.showAssignmentManager = false;
+                $scope.showAssignmentManagerList = false;
+
+                $scope.selectedImage = {};
+
+                //Added on 24-06-2016 for icon
+                $scope.showImageUploadIcon = {!showImgIcon};
+                $scope.showCommentsIcon = {!showNotesIcon};
+                $scope.showClearIcon = {!showRefreshIcon};
+                $scope.showQuesNumIcon ={!showQuesNumIcon};
+                
+                $scope.fileAttach = {};
+                $scope.responseFile = {};
+                
+                //new variable for save and submit.
+                //$scope.assignmentManagerHasAnswer = false;
+
+                $scope.selectedViewerConfigJSON = [];
+                if ('{!JSENCODE(selectedViewerConfigJSON)}' != null && '{!JSENCODE(selectedViewerConfigJSON)}' != '' && '{!JSENCODE(selectedViewerConfigJSON)}' != 'null') {
+                    $scope.selectedViewerConfigJSON = JSON.parse('{!JSENCODE(selectedViewerConfigJSON)}');
+                }
+                $scope.Show_Configuration_Options_in_Viewer = {!Show_Configuration_Options_in_Viewer};
+
+                $scope.decisionTreeResultTemplate = [];
+                if ('{!JSENCODE(decisionTreeResultString)}' != null && '{!JSENCODE(decisionTreeResultString)}' != '') {
+                    $scope.decisionTreeResultTemplate = JSON.parse('{!JSENCODE(decisionTreeResultString)}');
+                }
+                
+                $scope.showQuestionName_on_DecisionTree = {!show_Question_Name_on_Decision_Tree};
+                
+                $scope.decisionTreeQuesIdwithAnswerIdObj = {};
+                $scope.caseResponse = {};
+                
+                $scope.config = $scope.selectedViewerConfigJSON;
+                if($scope.config.ExAM__Single_Question_Mode__c){
+
+                    $scope.showSingleQuestion = true;
+                    $scope.questionsTemp = filterFilter($scope.questions,{$:$scope.sectionselectedvalue});
+                    $scope.showedquestion = $scope.questionsTemp != null && $scope.questionsTemp.length > 0 ? $scope.questionsTemp[0].questionTemplate.Id : '';
+                } else {
+                    $scope.showSingleQuestion = false;
+                    $scope.showedquestion = '';
+                }
+                if($scope.config.ExAM__Hierarchical_Object__c) {
+                    $scope.showHierarchical = true;
+                } else {
+                    $scope.showHierarchical = false;
+                }
+                if ($scope.config.ExAM__Data_Management__c) {
+                    $scope.showDataManagement = true;
+                } else {
+                    $scope.showDataManagement = false;
+                }       
+                if ($scope.config.ExAM__Assignment_Manager__c) {
+                    $scope.showAssignmentManager= true;
+                } else {
+                    $scope.showAssignmentManager = false;
+                }
+                if ($scope.config.ExAM__Assignment_Manager_List__c) {
+                    $scope.showAssignmentManagerList= true;
+                } else {
+                    $scope.showAssignmentManagerList= false;
+                }              
+                    
+                /** Data Management Tab Records Population Functionality Starts **/
+                $scope.allAnswerObj = [];
+
+                $scope.callRemoteActionTOQueryAllAnswerRecords = function() {
+
+                    mainappservice.fetchAllAnswerRecords().then(function(data){
+
+                        $scope.allAnswerObj = data;
+                    },function(data){
+                        console.log(data);
+                    });
+                }
+
+                $scope.callTabViewChangeFn = function(event) {
+                    $("#menuId").hide();
+                    if (event.target.attributes.title.value == 'Data Management') {
+                        $scope.callRemoteActionTOQueryAllAnswerRecords();
+                    }
+                }
+                $scope.showMenu = function() {
+                    $("#menuId").show();
+                }
+                $scope.openAnswerRecord = function(ansId) {
+
+                    window.location.href = '/'+ansId;
+                }
+                $scope.deleteAnswerRecord = function(answerId, indexval) {
+                    var confirmMsg = confirm('Are you sure?');
+                    
+                    if (confirmMsg) {
+                        $scope.allAnswerObj.splice(indexval,1);
+                        ExAM.DataManagementController.deleteAnswerRecord(answerId, function(result, event) {
+                            if (result != null && result != '') {
+                            } else {
+                                alert('error:::'+result);
+                            }
+                        });
+                    }
+                }
+                $scope.callRemoteActionTOQueryAllAnswerRecords();
+                /** Data Management Tab Records Population Functionality Ends **/
+
+                /** Assignment Manager List Tab Records Population Functionality Starts **/
+                $scope.allAssignmentManagersObj = new Object();
+
+                $scope.callRemoteActionTOQueryAllAssignmentManagerRecords = function() {
+
+                    mainappservice.fetchAllManagerRecords().then(function(data){
+
+                        $scope.allAssignmentManagersObj = data;
+                    },function(data){
+                        console.log(data);
+                    });
+                }
+                $scope.openAssignmentManagerRecord = function(selectedMngerId) {
+
+                    window.location.href = '/'+selectedMngerId;
+                }
+                $scope.callRemoteActionTOQueryAllAssignmentManagerRecords();
+                /** Assignment Manager List Tab Records Population Functionality Ends **/
+
+                /**
+                    Added on 23-06-2016 for Implementing Dependent Questions Functionality
+                **/
+                $scope.nextDependentQuestion = {};
+
+                /**
+                    Added on 23-06-2016 for Implementing Dependent Questions Functionality
+                    Code Below calls the function in service which queries all the dependent question template
+                    below the section templates under assessment template.
+                **/
+                mainappservice.queryDependentQuestions('{!$CurrentPage.parameters.asstempid}').then(function(data){
+
+                    $scope.dependentQuestionsObj = data.dependentQuestionsObj;
+                    mainappservice.queryImageQuestionTypeAttachments( data.attachmentIds ).then(function(queriedAttData){
+                        $scope.dependentQuestionsAttObj = queriedAttData;
+                    },
+                    function(attErrData) {
+                    });
+
+                },function(data){
+                });
+
+                /**
+                    Added on 23-06-2016 for Implementing Dependent Questions Functionality
+                    Code Below returns the dependent question for current question
+                **/
+                $scope.returnRelatedDependentQuestion = function(forWhichQuestion, selectedAnswer) {
+
+                    var availableAnswerOptions = [];
+                    var availableDependentQuestionsOptions = [];
+                    var answerPosition = -1;
+
+                    if ( angular.isDefined(forWhichQuestion.ExAM__Dependent_Question__c) ) {
+
+                        if (forWhichQuestion.ExAM__Dependent_Question__c.indexOf('~') > 0) {
+                            availableDependentQuestionsOptions = forWhichQuestion.ExAM__Dependent_Question__c.split('~');
+                        }
+                        else {
+                            availableDependentQuestionsOptions.push( forWhichQuestion.ExAM__Dependent_Question__c );
+                        }
+                        if ( angular.isDefined(forWhichQuestion.ExAM__Subquestion_Label__c) ) {
+                            if (forWhichQuestion.ExAM__Subquestion_Label__c.indexOf('~') > 0) {
+                                availableAnswerOptions = forWhichQuestion.ExAM__Subquestion_Label__c.split('~');
+                            }
+                            else {
+                                availableAnswerOptions.push( forWhichQuestion.ExAM__Subquestion_Label__c );
+                            }
+                        }
+                        if (availableAnswerOptions.length > 0) {
+                            for(var i=0;i<availableAnswerOptions.length;i++) {
+                                if (availableAnswerOptions[i] == selectedAnswer) {
+                                    answerPosition = i;
+                                    break;
+                                }
+                            }
+                        }
+                        if (availableDependentQuestionsOptions.length > answerPosition &&
+                            angular.isDefined( availableDependentQuestionsOptions[answerPosition] ) &&
+                            angular.isDefined( $scope.dependentQuestionsObj[ availableDependentQuestionsOptions[answerPosition]] )
+                        ) {
+
+                            $scope.nextDependentQuestion[ forWhichQuestion.Id ] = $scope.dependentQuestionsObj[availableDependentQuestionsOptions[answerPosition]];
+                        }
+                        else if ( angular.isDefined( availableDependentQuestionsOptions[0] ) &&
+                                  angular.isDefined( $scope.dependentQuestionsObj[ availableDependentQuestionsOptions[0]] )
+                        ) {
+
+                            $scope.nextDependentQuestion[ forWhichQuestion.Id ] = $scope.dependentQuestionsObj[availableDependentQuestionsOptions[0]];
+                        }
+                    }
+                    return $scope.nextDependentQuestion;
+                }
+
+                $scope.splitOptions = function(strOption) {
+                    var options = [];
+                    if(strOption != null && strOption != '') {
+                        options = strOption.split('~');
+                    }
+                    return options;
+                }
+
+                //new code for save and submit.
+                /*if ($scope.assignmentmanagerId != null && $scope.assignmentmanagerId != '') {
+
+                    mainappservice.hasAnswerRecords($scope.assignmentmanagerId).then(function(ansData){
+                        $scope.assignmentManagerHasAnswer = ansData.hasAnswer;
+                    }, function(ansErrData){
+                        $scope.assignmentManagerHasAnswer = false;
+                    });
+                }*/
+
+                $scope.saveQuestion = function(isSubmit) {
+
+                    var errorFlag = false;
+                    $('.errormessage, .successmessage, .errmessage').css('display', 'none');
+
+                    if (isSubmit) { // && $scope.assignmentManagerHasAnswer)
+                        $scope.errorFlag = false;
+                    }
+                    else {
+                        $('.validatetrue').each(function() {
+                            if($(this).val() == '' || $(this).val().trim() == '') {
+                                $(this).parent('div').addClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','');
+                                errorFlag = true;
+                            } else {
+                                $(this).parent('div').removeClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','none');
+                                
+                            }
+                        });
+                        $('.validateradiotrue').each(function() {
+                            $(this).parent('div').addClass('currentRadio');
+                            if($('.currentRadio input[type=radio]:checked').length == 0) {
+                                $(this).parent('div').addClass('slds-has-error');
+                                $(this).parent('div').parent().find('.requiredMessage').css('display','');
+                                errorFlag = true;
+                            } else {
+                                $(this).parent('div').removeClass('slds-has-error');
+                                $(this).parent('div').parent().find('.requiredMessage').css('display','none');
+                            }
+                            $(this).parent('div').removeClass('currentRadio');
+                        });
+                        $('.validatepicklisttrue').each(function() {
+    
+                            if($(this).val() == null || $(this).val() == '' || $(this).val() == '?') {
+                                $(this).parent('div').addClass('slds-has-error');
+                                $(this).parent('div').parent().find('.requiredMessage').css('display','');
+                                errorFlag = true;
+                            } else {
+                                $(this).parent('div').removeClass('slds-has-error');
+                                $(this).parent('div').parent().find('.requiredMessage').css('display','none');
+                            }
+                        });
+                        $('.validatecheckboxtrue').each(function() {
+                            $(this).parent().parent('div').addClass('currentcheckbox');
+                            if($('.currentcheckbox input[type=checkbox]:checked').length == 0) {
+                                $(this).parent().parent('div').addClass('slds-has-error');
+                                $(this).parent().parent('div').parent().find('.requiredMessage').css('display','');
+                                errorFlag = true;
+                            } else {
+                                $(this).parent().parent('div').removeClass('slds-has-error');
+                                $(this).parent().parent('div').parent().find('.requiredMessage').css('display','none');
+                            }
+                            $(this).parent().parent('div').removeClass('currentcheckbox');
+                        });
+                        $('.validateEmail:visible').each(function() {
+                           var email = $(this).val(); 
+                           var regx = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+                           if(email.length >0) {
+                               var validateResult =  regx.test(email);                           
+                               if(validateResult == false ){
+                                    $(this).parent('div').addClass('slds-has-error');
+                                    $(this).parent('div').find('.validateEmailMessage').css('display','');
+                                    errorFlag = true;
+                               } else {
+                                    $(this).parent('div').removeClass('slds-has-error');
+                                    $(this).parent('div').find('.validateEmailMessage').css('display','none');
+                               }
+                           }
+                        });
+                        $('.validatePhone:visible').each(function() {
+                           var validateResult;
+                           var PhNum;
+                           var phoneVal = $(this).val(); 
+                           var phoneId = $(this).attr('id'); 
+                           var phoneRegx = /^((\+)?[1-9]{1,2})?([-\s\.])?((\(\d{1,4}\))|\d{1,4})(([-\s\.])?[0-9]{1,12}){1,2}$/;
+                           if(phoneVal.length > 0) { 
+                           
+                               validateResult =  phoneRegx.test(phoneVal);
+                               PhNum  = phoneVal.replace(/[()-\s+]/g,'');
+                               $scope.response[phoneId] = PhNum;
+                               if(validateResult == false){
+                               
+                                    $(this).parent('div').addClass('slds-has-error');
+                                    $(this).parent('div').find('.validatePhNumMessage').css('display','');
+                                    errorFlag = true;
+                                    
+                               } else {
+                               
+                                    $(this).parent('div').removeClass('slds-has-error');
+                                    $(this).parent('div').find('.validatePhNumMessage').css('display','none');
+                                
+                               }
+                           }
+                        });                    
+                        $('.imageValidatetrue:visible').each(function() {
+    
+                            var Id = $(this).attr('id'); 
+    
+                            if($scope.selectedImage[Id]) {
+                                $(this).parent('div').removeClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','none');
+                            }else {
+                                $(this).parent('div').addClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','');
+                                errorFlag = true;
+                            }
+                        });
+                        $('.validateBtntrue:visible').each(function() {
+                    
+                            var Id = $(this).attr('id'); 
+                            Id = Id.replace('Btn','');
+                            if($scope.isSelectBtnOptn[Id]) {
+                                $(this).parent('div').removeClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','none');
+                            } else {
+                                $(this).parent('div').addClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','');
+                                errorFlag = true;
+                            }
+                        });
+                        $('.validateSignImagetrue:visible').each(function() {
+                            var Id = $(this).find('.validateSign').attr('id'); 
+                            Id = Id.replace('sign','');
+                            console.log(':::::::Id:::::::',Id);
+                            console.log(':::::::signImage[Id]:::::::',$scope.signImage[Id]);
+                            
+                            if (!angular.isUndefined($scope.signImage[Id])) {
+                                if($scope.signImage[Id])  {
+                                    $(this).removeClass('slds-has-error');
+                                    $(this).parent('div').find('.requiredMessage').css('display','none');        
+                                } else {
+                                    $(this).addClass('slds-has-error');
+                                    $(this).parent('div').find('.requiredMessage').css('display','');
+                                    errorFlag = true;  
+                                }
+                            } else {
+                                console.log(':::enter::::');
+                                $(this).addClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','');
+                                errorFlag = true;  
+                            }
+                        });
+                        $('.hotspotImagetrue:visible').each(function() {
+                            var hotspotQId = $(this).attr('id'); 
+                            hotspotQId = hotspotQId.replace('hotspot','');
+                            console.log(':::::hotspot::Id:::::::',hotspotQId );
+                            console.log(':::::::signImage[Id]:::::::',$scope.response[hotspotQId]);
+                            
+                            if (!angular.isUndefined($scope.response[hotspotQId])) {
+                                $(this).removeClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','none');        
+                            } else {
+                                console.log(':::enter::::');
+                                $(this).addClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','');
+                                errorFlag = true;  
+                            }
+                        });
+                        $('.ListQTypetrue:visible').each(function() {
+                            var listQTypeQId = $(this).attr('id'); 
+                            listQTypeQId = listQTypeQId.replace('ListQType','');
+                            
+                            if (!angular.isUndefined($scope.response[listQTypeQId])) {
+                                $(this).removeClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','none');        
+                            } else {
+                                $(this).addClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','');
+                                errorFlag = true;  
+                            }
+                        });
+                        //Case question type code 06-07-2016
+                        $('.caseValidatetrue:visible').each(function() {
+                        
+                           var validateResult;
+                           var caseVal = $(this).val(); 
+                           
+                           if (caseVal.length > 0) {
+                                $(this).parent('div').removeClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','none');
+                            } else {            
+                                $(this).parent('div').addClass('slds-has-error');
+                                $(this).parent('div').find('.requiredMessage').css('display','');
+                                errorFlag = true;  
+                            }
+                           
+                        });
+                        $('.caseEmailValidatetrue:visible').each(function() {
+                    
+                           var validateResult;
+                           var email = $(this).val(); 
+                           var regx = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+                           
+                           if(email.length > 0) {
+                               
+                               validateResult =  regx.test(email);
+    
+                               if(validateResult == false ){
+                               
+                                    $(this).parent('div').addClass('slds-has-error');
+                                    $(this).parent('div').find('.requiredEmailMessage').css('display','');
+                                    errorFlag = true;
+                               } else {
+                                    
+                                    $(this).parent('div').removeClass('slds-has-error');
+                                    $(this).parent('div').find('.requiredEmailMessage').css('display','none');
+                                    
+                              }
+                          }
+                           
+                        });
+                    }
+                    if (errorFlag) {
+                        return null;
+                    }
+                    $('.imgStyle').each(function(){
+                        $(this).css({'border': 'none'});
+                    });
+                    $('.btnStyle').each(function(){
+                        $(this).css({'border': '1px solid #d8dde6','background-color': 'white'});
+                    });
+                    var answerList = [];
+                    if ($scope.hierarchicalrecordIds.length == 0) {
+                        angular.forEach($scope.response, function(value, key) {
+                            
+                            answerObj = new Object();
+                            answerObj.questiontemplateId = key;
+                            if(angular.isDefined($scope.comment[key])) {
+                                answerObj.comment = $scope.comment[key];   
+                            }                        
+                            if(angular.isObject(value)){
+                            var answer = ""
+                                for(var option in value){
+                                    if(value[option] && option != "$$hashKey") {
+                                        if (answer == "") {
+                                            answer += option;
+                                        } else {
+                                            answer += '~'+option; 
+                                        }
+                                    }
+                                } 
+                                answerObj.response = answer;   
+                            }
+                            else{
+                                answerObj.response = value;
+                            }
+                            
+                            
+                            answerObj.assignmentManagerId = $scope.assignmentmanagerId;
+                            this.push(answerObj);
+                        }, answerList); 
+                    } else if ($scope.hierarchicalrecordIds.length > 0) {
+                        for (i = 0 ; i < $scope.hierarchicalrecordIds.length ; i++) {
+                            angular.forEach($scope.response, function(value, key) {
+                                
+                                answerObj = new Object();
+                                answerObj.questiontemplateId = key;
+                                if(angular.isDefined($scope.comment[key])) {
+                                    answerObj.comment = $scope.comment[key];   
+                                }                  
+                                answerObj.hierarchalObjId = $scope.hierarchicalrecordIds[i];
+                                   
+                                if(angular.isObject(value)){
+                                var answer = ""
+                                    for(var option in value){
+                                        if(value[option] && option != "$$hashKey") {
+                                            if (answer == "") {
+                                                answer += option;
+                                            } else {
+                                                answer += '~'+option; 
+                                            }
+                                        }
+                                    } 
+                                    answerObj.response = answer;   
+                                }
+                                else{
+                                    answerObj.response = value;
+                                }
+                                
+                                
+                                answerObj.assignmentManagerId = $scope.assignmentmanagerId;
+                                this.push(answerObj);
+                            }, answerList); 
+                        }
+                    }
+                    console.log(':::answerList:::'+answerList);
+                    /*if (answerList.length == 0  && !(isSubmit && $scope.assignmentManagerHasAnswer)) {
+                        $('.errormessage').css('display','');
+                        return null;
+                    }*/
+                    
+                    if($scope.responseFile != null) { 
+                        var attachmentlist=[];
+                        try {
+                            for (var key in $scope.responseFile) { 
+                                    
+                                var attach = new sforce.SObject("Attachment");
+                                attach.Name        = $scope.responseFile[key].name;
+                                attach.Body        = $scope.responseFile[key].resultbody;
+                                attach.ContentType = $scope.responseFile[key].contenttype;
+                                attach.ParentId    = '{!$CurrentPage.parameters.amid}';
+                                attach.IsPrivate   = false;
+                                attachmentlist.push( attach );
+                            
+                            }
+                            attachment_result = sforce.connection.create(attachmentlist);
+                        }
+                        catch(error){
+                            console.log(':::errror:::',error.message);
+                        } 
+                        $scope.responseFile = {};
+                    }
+                    attList = [];
+                    ExAM.AssessmentViewerController.saveAnswerRecords(answerList, $scope.templateIdValue, $scope.assignmentmanagerId, isSubmit, $scope.caseResponse, $scope.decisionTreeQuesIdwithAnswerIdObj, function(result, event) {
+                        if (event.status) {
+                            if (result != null && result != '') {
+                                if (result == 'No Answers created since all answered questions has Do Not Create flag checked') { 
+                                    $('.errmessage').html(result);
+                                    $('.errmessage').css('display','');
+                                }
+                                else {
+                                    if (result == 'Assignment Manager updated successfully') {
+                                        $('.successmessage').children().html(result);
+                                        $('.successmessage').css('display','');
+                                    }
+                                    else {
+                                        console.log('reached here');
+                                        $('.successmessage').css('display','');
+                                        resultobject = JSON.parse(_.unescape((result)));
+                                        var attachmentlist = [];
+                                        angular.forEach($scope.photo, function(value, key) {
+
+                                            if (angular.isDefined(resultobject[key])) {
+                                                answeridList = resultobject[key];
+                                                for (j = 0; j < answeridList.length; j++) {        
+                                                    var attach = new sforce.SObject("Attachment");
+    
+                                                    attach.Name        = value.name;
+                                                    attach.ContentType = value.contenttype;
+                                                    attach.Body        = value.resultbody;
+                                                    attach.ParentId    = answeridList[j];
+                                                    attach.IsPrivate   = false;                                            
+                                                    attachmentlist.push(attach);
+                                                }
+                                            }
+                                        });
+                                        angular.forEach($scope.fileAttach, function(value, key) {
+
+                                            if (angular.isDefined(resultobject[key])) {
+                                                answeridList = resultobject[key];
+                                                for (j = 0; j < answeridList.length; j++) {        
+                                                    var attach = new sforce.SObject("Attachment");
+        
+                                                    attach.Name        = value.name;
+                                                    attach.ContentType = value.contenttype;
+                                                    attach.Body        = value.resultbody;
+                                                    attach.ParentId    = answeridList[j];
+                                                    attach.IsPrivate   = false;                                            
+                                                    attachmentlist.push(attach);
+                                                }
+                                            
+                                            }
+                                        });
+                                        console.log('::::$scope.signImage:::',$scope.signImage);
+                                        angular.forEach($scope.signImage, function(value, key) {
+
+                                            if (angular.isDefined(resultobject[key])) {
+                                                answeridList = resultobject[key];
+                                                for (j = 0; j < answeridList.length; j++) {        
+                                                    var attach = new sforce.SObject("Attachment");
+            
+                                                    attach.Name        = 'Signature';
+                                                    attach.ContentType = 'image/png';
+                                                    attach.Body        = $scope.signImage[key].replace("data:image/png;base64,","");
+                                                    attach.ParentId    = answeridList[j];
+                                                    attach.IsPrivate   = false;                                            
+                                                    attachmentlist.push(attach);
+                                                }
+                                                
+                                            }
+                                        });
+                                        attachment_result = sforce.connection.create(attachmentlist);
+                                    } 
+                                    $scope.response = {};
+                                    $scope.selectedImage = {};
+                                    $scope.isSelectBtnOptn = {};
+                                    
+                                    $scope.photo = {};
+                                    $scope.fileAttach = {};
+                                    $scope.responseFile = {};
+                                    $scope.signImage = {};
+                                    $scope.maphilightChanges();
+                                    $scope.decisionTreeQuesIdwithAnswerIdObj = {};
+                                    $scope.caseResponse = {};
+                                    $('.liClass').removeClass('slds-is-selected');
+                                    $scope.$apply();
+                                    
+                                }
+                            }    
+                        } else {
+                            alert('error:::'+result);
+                        }
+                    });
+                }
+
+                $scope.opencomment = function(selQuestionId) {
+                    
+                    $scope.selecteQuestionId = selQuestionId;
+                    $('.answercomment').removeClass('slds-modal__close');
+                    $('.answercomment').addClass('slds-fade-in-open');
+                }
+                $scope.closecomment = function() {
+                    $('.answercomment').addClass('slds-modal__close');
+                    $('.answercomment').removeClass('slds-fade-in-open');
+                }
+                $scope.savecomment = function() {    
+                    $('.answercomment').addClass('slds-modal__close');
+                    $('.answercomment').removeClass('slds-fade-in-open');
+                }
+                
+                $scope.openPhotoUpload = function(selQuestionId) {
+                    document.getElementById('fid').value = '';
+                    $scope.photoQuestionId = selQuestionId;
+                    $('.photoUpload').removeClass('slds-modal__close');
+                    $('.photoUpload').addClass('slds-fade-in-open');
+                }
+                $scope.closePhotoUpload = function() {
+                    $('.photoUpload').addClass('slds-modal__close');
+                    $('.photoUpload').removeClass('slds-fade-in-open');
+                }
+                $scope.savePhoto = function() {    
+                    $('.photoUpload').addClass('slds-modal__close');
+                    $('.photoUpload').removeClass('slds-fade-in-open');
+                }
+                <!--add on 15-09-2016-->
+                $scope.openSignatureModal = function(selectQuestionId,option) {
+                    $scope.chooseQuesId = selectQuestionId;
+                    if(option){
+                        $scope.signAnsOption = option;
+                    }else{
+                        $scope.signAnsOption = 'NoData';
+                    }
+                    $('.sign').removeClass('slds-modal__close');
+                    $('.sign').addClass('slds-fade-in-open'); 
+                    $timeout(function(){
+                        var canvas = document.getElementById('canvas'+selectQuestionId);
+                        var context = canvas.getContext('2d');
+                        signature = new SignaturePad(canvas, {
+                            backgroundColor: 'rgba(255, 255, 255, 0)',
+                            penColor: 'rgb(0, 0, 0)'
+                        });
+                        if($scope.signImage[$scope.chooseQuesId]){
+                            var imageObj = new Image();
+                            imageObj.onload = function() {
+                              context.drawImage(imageObj, 0, 0);
+                            };
+                            imageObj.src = $scope.signImage[$scope.chooseQuesId];
+                        }else{
+                            $scope.canvasClick = false;
+                        }
+                    },1000);
+                }
+                $scope.closeSign = function() {
+                     $scope.signAnsOption = null;
+                     $scope.tempsignAnsOption = null;
+                     $('.sign').addClass('slds-modal__close');
+                     $('.sign').removeClass('slds-fade-in-open');
+                }
+                $scope.clearSign = function(){
+                    signature.clear();
+                    $scope.tempsignAnsOption = angular.copy($scope.signAnsOption);
+                    $scope.signAnsOption = null;
+                };
+                $scope.canvasClickfunction = function(){
+                    console.log('::::$scope.canvasClick:::',$scope.canvasClick);
+                    $scope.canvasClick = true;
+                    console.log('::::$scope.tempsignAnsOption:::'+$scope.tempsignAnsOption);
+                    if($scope.tempsignAnsOption){
+                        $scope.signAnsOption = $scope.tempsignAnsOption;
+                    }
+                }
+                $scope.saveSign = function(){
+                    console.log('::::enter::::',$scope.signAnsOption);
+                    console.log('::::enter::::',$scope.canvasClick);
+                    if($scope.signAnsOption && $scope.canvasClick){
+                        console.log('::::enter::::');
+                        $scope.signImage[$scope.chooseQuesId] = signature.toDataURL('image/png');
+                        if($scope.signAnsOption == 'NoData'){
+                            $scope.response[$scope.chooseQuesId] = '';
+                        }else{
+                            $scope.response[$scope.chooseQuesId] = $scope.signAnsOption;
+                        }
+                        
+                    }else {
+                        delete $scope.signImage[$scope.chooseQuesId];
+                        delete $scope.response[$scope.chooseQuesId];
+                    }
+                    signature.clear();
+                    $('.sign').addClass('slds-modal__close');
+                    $('.sign').removeClass('slds-fade-in-open');
+                };
+                $scope.openHierarchical = function() {
+                    //$scope.photoQuestionId = selQuestionId;
+                    $('.Hierarchical').removeClass('slds-modal__close');
+                    $('.Hierarchical').addClass('slds-fade-in-open');
+                }
+                $scope.closeHierarchical = function() {
+                    $('.Hierarchical').addClass('slds-modal__close');
+                    $('.Hierarchical').removeClass('slds-fade-in-open');
+                }
+                $scope.saveHierarchical = function() {
+                    $('.Hierarchical').addClass('slds-modal__close');
+                    $('.Hierarchical').removeClass('slds-fade-in-open'); 
+                    $scope.hierarchicalrecordNames = [];
+                    $scope.hierarchicalrecordIds = []; 
+                    for (i = 0; i < $scope.hierarchicalIdwithNames.length; i++) {
+
+                        var idwithName = $scope.hierarchicalIdwithNames[i].split('~');
+                        if (idwithName.length > 1) {
+                            $scope.hierarchicalrecordIds.push(idwithName[0]);
+                            $scope.hierarchicalrecordNames.push(idwithName[1]);
+                        }
+                    }
+                }
+                $scope.imageTypeQues = function(usrSelectImageQuestion, usrSelectImage, $event, imgArr, id) {
+
+                    $scope.selectedImage[usrSelectImageQuestion.Id] = true;
+                    var options = [];
+                    if( angular.isDefined(usrSelectImageQuestion.ExAM__Subquestion_Label__c) ) {
+                        options = usrSelectImageQuestion.ExAM__Subquestion_Label__c.split('~');
+                    }
+                    var optionText = options[usrSelectImage]; 
+                    $scope.response[usrSelectImageQuestion.Id] = optionText;
+
+                    $.each(imgArr, function(key, value) {
+
+                        if (this["recId"] === id) {
+                            $('#'+id).css({'border': '1px solid black'});
+                        }
+                        else {
+                            $('#'+this["recId"]).css({'border': 'none'});
+                        }
+                    });                
+                }
+                
+                //Decision Tree.
+                $scope.DecisionTreeresponse = {};
+                $scope.decisionTreeQuestion = {};
+                $scope.previousQuestion = {};
+                
+                var client = new remotetk.Client();
+                $scope.questionsList = [];
+                $scope.questionNamewithQuestionTemplate = {};
+                $scope.resultQuestionNamewithQuestionTemplate = {};
+                $scope.resultQuestionIdDefaultValueObj = {};
+                
+                //Added on 14-06-2016 for Related Decision Tree chain functionality
+                $scope.createdAnswerRecordIdForResultTemplate = '';
+
+                var decisionTreeResultTemplateObj = [];
+
+                if ('{!JSENCODE(decisionTreeResultString)}' != null && '{!JSENCODE(decisionTreeResultString)}' != '') {
+                    decisionTreeResultTemplateObj = JSON.parse('{!JSENCODE(decisionTreeResultString)}');
+                }
+
+                client.query("SELECT Id, Name, ExAM__Subquestion_Label__c, ExAM__Weight_of_Answer__c, ExAM__HelpText__c,"+ 
+                                " ExAM__Section_Question__c, ExAM__Section_Question__r.ExAM__Questionnaire_Section__c, ExAM__Question_Label__c, ExAM__Question_Order_No__c,"+
+                                " ExAM__Question_Type__c, ExAM__Next_Question__c, ExAM__Is_Mandatory__c, ExAM__Decision_Tree__c "+
+                            " FROM ExAM__Question_Template__c "+
+                            " WHERE ExAM__Section_Question__r.ExAM__Questionnaire_Section__c ='{!templateId}'"+
+                            " ORDER BY ExAM__Question_Order_No__c ASC", function(responseQuery){
+                    
+                    $scope.questionsList = responseQuery.records;
+                    for (i = 0; i < $scope.questionsList.length; i++) { 
+
+                        $scope.questionNamewithQuestionTemplate[$scope.questionsList[i].Name] = $scope.questionsList[i];
+                        
+                        //Storing QuestionType equals Result in a separate JSON String
+                        if ($scope.questionsList[i].ExAM__Question_Type__c == 'Result') {
+
+                            $scope.resultQuestionNamewithQuestionTemplate[$scope.questionsList[i].Id] = $scope.questionsList[i];
+                            var answerFieldApiNameValueObj = {};
+                            //new code for answer option value assign into question response field on 22-08-2016
+                            if ($scope.questionsList[i].ExAM__Subquestion_Label__c != null && $scope.questionsList[i].ExAM__Subquestion_Label__c != '') {
+                                answerFieldApiNameValueObj['exam__response__c'] = $scope.questionsList[i].ExAM__Subquestion_Label__c;
+                            }    
+                            if ($scope.questionsList[i].ExAM__Decision_Tree__c != null &&
+                                $scope.questionsList[i].ExAM__Decision_Tree__c != ''
+                            ) {
+
+                                for(var dt=0; dt<decisionTreeResultTemplateObj.length; dt++) {
+
+                                    var answerDefaultValues = $scope.questionsList[i].ExAM__Decision_Tree__c.split('~');
+                                    for (b=0; b < answerDefaultValues.length; b++) {
+                                        if ((decisionTreeResultTemplateObj[dt].hasEnabled) 
+                                            && (decisionTreeResultTemplateObj[dt].fieldAPIName == answerDefaultValues[b].split(':')[0])
+                                        ) {
+
+                                            answerFieldApiNameValueObj[ answerDefaultValues[b].split(':')[0] ] = answerDefaultValues[b].split(':')[1];
+                                        }
+                                    }
+                                }
+                            }
+                            $scope.resultQuestionIdDefaultValueObj[ $scope.questionsList[i].Id ] = answerFieldApiNameValueObj;
+                        }
+                    } 
+                });
+                
+                $scope.decisionTreeOpenWindow = function(isDecisionTree, answer, questionTemplate) {
+
+                    $scope.decisionTreeStartQuestionId = questionTemplate.Id;
+                    if (isDecisionTree) {
+                        var questionPosition = -1;
+                        
+                        if ( angular.isDefined(questionTemplate.ExAM__Subquestion_Label__c) ) {
+                            var answerOptions = questionTemplate.ExAM__Subquestion_Label__c.split('~');
+
+                            for (i=0; i < answerOptions.length; i++) {
+                                if (answer == answerOptions[i]) {
+                                    questionPosition = i;
+                                    break;
+                                }
+                            }
+                        }
+                        var nextquestionList = questionTemplate.ExAM__Next_Question__c.split('~');    
+
+                        //Added isDefined codn check on 14-06-2016 to ensure there is a question defined on selected Answer's position
+                        if( nextquestionList.length > questionPosition && 
+                            angular.isDefined( nextquestionList[questionPosition] ) &&
+                            angular.isDefined( $scope.questionNamewithQuestionTemplate[nextquestionList[questionPosition]] )
+                        ) {
+
+                            $scope.decisionTreeQuestion = $scope.questionNamewithQuestionTemplate[nextquestionList[questionPosition]];
+
+                        //Added isDefined codn check on 14-06-2016 to ensure there is a question defined on selected Answer's position
+                        } else if ( nextquestionList.length > 0 && 
+                            angular.isDefined( nextquestionList[0] ) &&
+                            angular.isDefined( $scope.questionNamewithQuestionTemplate[nextquestionList[0]] )
+                        ) {
+
+                            $scope.decisionTreeQuestion = $scope.questionNamewithQuestionTemplate[nextquestionList[0]];
+                        }   
+                        $('.DecisionTree').removeClass('slds-modal__close');
+                        $('.DecisionTree').addClass('slds-fade-in-open');                     
+                        if ($scope.decisionTreeQuestion.ExAM__Question_Type__c == 'Result' ) {
+
+                            $scope.populateDefaultValuesForResultTemplate( $scope.decisionTreeQuestion.Id );
+                        }
+                    }
+                }
+                
+                $scope.decisionTreeNextQuestion = function(answer, questionTemplate) {
+                    if (angular.isUndefined(answer)) {
+                        return false;
+                    }
+                    
+                    var questionPosition = -1;
+                    if ( angular.isDefined(questionTemplate.ExAM__Subquestion_Label__c) ) {
+                        var answerOptions = questionTemplate.ExAM__Subquestion_Label__c.split('~');
+                        for (i=0; i < answerOptions.length; i++) {
+                            if (answer == answerOptions[i]) {
+                                questionPosition = i;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if ( angular.isDefined(questionTemplate.ExAM__Next_Question__c) ) {
+
+                        var nextquestionList = questionTemplate.ExAM__Next_Question__c.split('~');    
+
+                        //Added isDefined codn check on 14-06-2016 to ensure there is a question defined on selected Answer's position
+                        if( nextquestionList.length > questionPosition && 
+                            angular.isDefined( nextquestionList[questionPosition] ) &&
+                            angular.isDefined( $scope.questionNamewithQuestionTemplate[nextquestionList[questionPosition]] )
+                        ) {
+
+                            $scope.decisionTreeQuestion = $scope.questionNamewithQuestionTemplate[nextquestionList[questionPosition]];
+
+                        //Added isDefined codn check on 14-06-2016 to ensure there is a question defined on selected Answer's position
+                        } else if(nextquestionList.length > 0 && 
+                            angular.isDefined( nextquestionList[0] ) &&
+                            angular.isDefined( $scope.questionNamewithQuestionTemplate[nextquestionList[0]] )
+                        ) {
+
+                            $scope.decisionTreeQuestion = $scope.questionNamewithQuestionTemplate[nextquestionList[0]];
+                        }                        
+                    } else {
+
+                        $scope.savedecisionTreeQuestion(true, questionTemplate, 'SAVE');
+                        $scope.decisionTreeQuestion = {};
+                    }
+                    if (questionTemplate != null && questionTemplate.Name != null && 
+                        $scope.decisionTreeQuestion != null && $scope.decisionTreeQuestion.Name) {
+
+                        $scope.previousQuestion[$scope.decisionTreeQuestion.Name] = questionTemplate;
+                    }
+                    if ($scope.decisionTreeQuestion.ExAM__Question_Type__c == 'Result' ) {
+
+                        $scope.populateDefaultValuesForResultTemplate( $scope.decisionTreeQuestion.Id );
+                    }
+                }
+                
+                $scope.previousQuestion = function(decisionTree_QuestionName) {
+
+                    if ($scope.previousQuestion != null && $scope.previousQuestion[decisionTree_QuestionName] != null) {
+                        $scope.decisionTreeQuestion = $scope.previousQuestion[decisionTree_QuestionName];
+                    }
+                }
+                
+                //save decision tree answers
+                $scope.savedecisionTreeQuestion = function(isDontHaveResultQuestion, resultQuestion, isSubmit) {
+
+                    var decisionTreeanswerList = [];
+                    $('.DecisionTree').addClass('slds-modal__close');
+                    $('.DecisionTree').removeClass('slds-fade-in-open');
+                    var i = 0;
+                    var j = 1;
+                    var length = Object.keys($scope.DecisionTreeresponse).length;
+
+                    angular.forEach($scope.DecisionTreeresponse, function(value, key) {
+
+                        if (key.indexOf('~~') > 0) {
+
+                            if( i == 0 ) {
+                                answerObj = new Object();
+                                answerObj.ExAM__Question_Template__c = key.split('~~')[0];
+                                answerObj.ExAM__Issue_Request__c = $scope.assignmentmanagerId;
+
+                                //Added on 14-06-2016 for Related Decision Tree chain functionality
+                                if ($scope.createdAnswerRecordIdForResultTemplate.length) {
+                                    answerObj.ExAM__Related_Answer__c = $scope.createdAnswerRecordIdForResultTemplate;
+                                }
+                                i = i+1;
+                            }
+                            var fieldApiNameStr = key.split('~~')[1];
+                            answerObj[ fieldApiNameStr ] = value;
+                            if (j == length) {
+                                this.push(answerObj);
+                            }
+                        }
+                        else {
+                            
+                            if ({!NOT(skip_Answer_For_Decision_Tree_Steps)}) {
+                                answerObj = new Object();
+                                answerObj.ExAM__Question_Template__c = key; 
+                                if (typeof value == 'object'){
+                                    var answer = '';
+                                    for (var option in value){
+                                        if (value[option] && option != "$$hashKey") {
+                                            if (answer.length > 0) {
+                                                answer += '~'+option;
+                                            }
+                                            else {
+                                                answer = option;
+                                            }
+                                        }
+                                    }
+                                    answerObj.ExAM__Response__c = answer;
+                                } else {        
+                                    answerObj.ExAM__Response__c = value;
+                                }                       
+                                answerObj.ExAM__Issue_Request__c = $scope.assignmentmanagerId;
+                                this.push(answerObj);
+                            } else if (isDontHaveResultQuestion) {
+                                if (j == length) {
+                                    answerObjwithoutResultQuestion = new Object();
+                                    answerObjwithoutResultQuestion.ExAM__Question_Template__c = key; 
+                                    if (typeof value == 'object'){
+                                        var answer = '';
+                                        for (var option in value){
+                                            if (value[option] && option != "$$hashKey") {
+                                                if (answer.length > 0) {
+                                                    answer += '~'+option;
+                                                }
+                                                else {
+                                                    answer = option;
+                                                }
+                                            }
+                                        }
+                                        answerObjwithoutResultQuestion.ExAM__Response__c = answer;
+                                    } else {        
+                                        answerObjwithoutResultQuestion.ExAM__Response__c = value;
+                                    }                       
+                                    answerObjwithoutResultQuestion.ExAM__Issue_Request__c = $scope.assignmentmanagerId;
+                                    this.push(answerObjwithoutResultQuestion);
+                                }
+                            }
+                        }
+                        j++;
+                    }, decisionTreeanswerList);
+
+                    if (decisionTreeanswerList.length > 0) {
+
+                        //Moved Decision Tree Answers save functionality invocation to service on 14-06-2016
+                        mainappservice.saveDecisionTreeAnswersInBackEnd(decisionTreeanswerList).then(function(data) {
+
+                            $scope.DecisionTreeresponse = {};
+
+                            var resultObject = data;
+                            
+                            console.log(':::::resultObject::::Decision Tree::::',resultObject);
+                            if (angular.isDefined(resultObject) && angular.isObject(resultObject)) {
+                                $scope.decisionTreeQuesIdwithAnswerIdObj = angular.extend($scope.decisionTreeQuesIdwithAnswerIdObj, resultObject );
+                                console.log('::::questionIdwith AnswerId:::',$scope.decisionTreeQuesIdwithAnswerIdObj);
+                            }
+                            
+                            var attachmentlist = [];
+                            var attachmentQuestionId;
+                            $.each($scope.photo, function(key, value) {
+
+                                if (resultObject.hasOwnProperty(key)) {
+                                    attachmentQuestionId = key;
+                                    var attach = new sforce.SObject("Attachment");
+                                    attach.Name        = value.name;
+                                    attach.ContentType = value.contenttype;
+                                    attach.Body        = value.resultbody;
+                                    attach.ParentId    = resultObject[key];
+                                    attach.IsPrivate   = false;
+                                    
+                                    attachmentlist.push( attach );
+                                }
+                            });
+                            if (attachmentlist != null && attachmentlist.length > 0) {
+                                attachment_result = sforce.connection.create(attachmentlist);
+                                delete $scope.photo[attachmentQuestionId];
+                            }
+
+                            //Added on 14-06-2016 for Related Decision Tree chain functionality
+                            if ( isSubmit == 'SAVE AND CONTINUE' &&
+                                 angular.isDefined(resultQuestion.ExAM__Next_Question__c)
+                            ) {
+                                $scope.createdAnswerRecordIdForResultTemplate = resultObject[resultQuestion.Id];
+                                $scope.decisionTreeOpenWindow(true, $scope.createdAnswerRecordIdForResultTemplate, resultQuestion);
+                            }
+                            else {
+                                $scope.createdAnswerRecordIdForResultTemplate = '';
+                            }
+
+                        },function(error) {
+                            console.log(error);
+                        });
+                    }
+                }
+
+                $scope.closeDecisionTree = function() {
+                    $('.DecisionTree').addClass('slds-modal__close');
+                    $('.DecisionTree').removeClass('slds-fade-in-open');
+                    $scope.DecisionTreeresponse = {};
+                    if (angular.isDefined($scope.response[$scope.decisionTreeStartQuestionId])) {
+                        delete $scope.response[$scope.decisionTreeStartQuestionId];
+                    }
+                }
+                //End Decision Tree....
+                    
+                $scope.loadconfig = function(tempconfig) {
+                    $('.generalConfig').addClass('slds-modal__close');
+                    $('.generalConfig').removeClass('slds-fade-in-open');
+                    
+                    if($scope.config.ExAM__Single_Question_Mode__c){
+                        $scope.showSingleQuestion = true;
+                        $scope.questionsTemp = filterFilter($scope.questions,{$:$scope.sectionselectedvalue});
+                        $scope.showedquestion = $scope.questionsTemp != null && $scope.questionsTemp.length > 0 ? $scope.questionsTemp[0].questionTemplate.Id : '';
+                    } else {
+                        $scope.showSingleQuestion = false;
+                        $scope.showedquestion = '';
+                    }
+                    if($scope.config.ExAM__Hierarchical_Object__c) {
+                        $scope.showHierarchical = true;
+                    } else {
+                        $scope.showHierarchical = false;
+                    }
+                    if ($scope.config.ExAM__Data_Management__c) {
+                        $scope.showDataManagement = true;
+                    } else {
+                        $scope.showDataManagement = false;
+                    } 
+                    if ($scope.config.ExAM__Assignment_Manager__c) {
+                        $scope.showAssignmentManager= true;
+                    } else {
+                        $scope.showAssignmentManager = false;
+                    }
+                    if ($scope.config.ExAM__Assignment_Manager_List__c) {
+                        $scope.showAssignmentManagerList= true;
+                    } else {
+                        $scope.showAssignmentManagerList= false;
+                    }
+                                       
+                }
+                $scope.changeViewer = function(tempconfig) {
+
+                    $scope.config = tempconfig;
+                    $scope.newConfigName = '';
+                }
+                $scope.change = function() {
+
+                    $scope.response = {};
+                    $('.successmessage').css('display','none');
+                    $scope.maphilightChanges();
+                }
+                $scope.maphilightChanges = function() {
+                    $timeout(function(){
+                        $('.map').maphilight({strokeColor:'808080',strokeWidth:0,fillColor:'00cd27'});
+                        
+                         //initialize highlight
+                           //map clicks
+                           $(".tabs area").click(function(){
+                               
+                               //This block is what creates highlighting by trigger the "alwaysOn", 
+                               
+                               //var data = $(this).data('maphilight') || {};
+                             //  data.alwaysOn = !data.alwaysOn;
+                              // $(this).data('maphilight', data).trigger('alwaysOn.maphilight'); 
+                               
+                               
+                               var data = $(this).data('maphilight') || {};
+                               data.alwaysOn = true;
+                               $(this).data('maphilight', data).trigger('alwaysOn.maphilight');
+                               data.alwaysOn = false;
+                               
+                               if(typeof tempThis === "undefined" && tempThis != $(this)){
+                                   tempThis.data('maphilight', data).trigger('alwaysOn.maphilight'); 
+                                   
+                                   
+                               }
+                               tempThis =  $(this); 
+                                
+                               //there is also "neverOn" in the docs, but not sure how to get it to work
+                                          
+                                     
+                               if ($(this).hasClass("current") == false)
+                               {
+                                   var thisTarget = $(this).attr("href");
+                                                                           
+                                   $(this).parents(".tabs").find('area.current').removeClass('current');
+                                            
+                                   $(this).addClass('current');
+                                                
+                                   $(this).parents(".tabs").nextAll(".tab-content").children(":visible").fadeOut(1, function() {
+                                       $(thisTarget).fadeIn("fast");
+                                   });
+                            
+                               }
+                               return false; 
+                          });   
+                        
+                        
+                    },200);
+                }
+                $scope.sectionchange = function() {
+
+                    $scope.response = {};
+                    $('.successmessage').css('display','none');
+                    if($scope.config.ExAM__Single_Question_Mode__c){
+                        $scope.showSingleQuestion = true;
+                        $scope.questionsTemp = filterFilter($scope.questions,{$:$scope.sectionselectedvalue});
+                        $scope.showedquestion = $scope.questionsTemp != null && $scope.questionsTemp.length > 0 ? $scope.questionsTemp[0].questionTemplate.Id : '';
+                    } else {
+                        $scope.showSingleQuestion = false;
+                        $scope.showedquestion = '';
+                    }
+                    $scope.maphilightChanges();
+                }
+                $scope.populateDefaultValuesForResultTemplate = function(resultTemplateId) {
+
+                    /**
+                        Below line added on 24-08-2016 to set question template id for DecisionTreeresponse
+                        if there is no value given for any of the visible fields in Result Question
+                    **/
+                    $scope.DecisionTreeresponse[resultTemplateId+'~~'+'ExAM__Question_Template__c'] = resultTemplateId;
+
+                    if (angular.isDefined($scope.resultQuestionIdDefaultValueObj[resultTemplateId]) ) {
+                        angular.forEach($scope.resultQuestionIdDefaultValueObj[resultTemplateId], function(value, key) {
+                            if ( ($scope.DecisionTreeresponse[resultTemplateId+'~~'+key] == '')
+                                 || ($scope.DecisionTreeresponse[resultTemplateId+'~~'+key] == null)
+                                 || ($scope.DecisionTreeresponse[resultTemplateId+'~~'+key] == undefined)
+                            ) {
+
+                                $scope.DecisionTreeresponse[resultTemplateId+'~~'+key] = value;
+                            }
+                        });
+                    }
+                    console.log(':::',$scope.DecisionTreeresponse);
+                }
+                //Added on 27-06-2016 for Button Question Type Selected Options
+                $scope.setSelectedOption = function(forWhichQuestion, selOption, options, fromDecisionTree) {
+                    $scope.isSelectBtnOptn[forWhichQuestion.Id] = true;
+                    for(var i=0;i<options.length;i++) {
+                        var btnId = i+forWhichQuestion.Id;
+                        if (options[i] == selOption) {
+                            document.getElementById(btnId).style.border = '1px solid black';
+                            document.getElementById(btnId).style.backgroundColor = 'lightblue';
+                        }
+                        else {
+                            document.getElementById(btnId).style.border = 'none';
+                            document.getElementById(btnId).style.backgroundColor = '';
+                        }
+                    }
+                    if (fromDecisionTree) {
+                        $scope.DecisionTreeresponse[forWhichQuestion.Id] = selOption;
+                    } else {
+                        $scope.response[forWhichQuestion.Id] = selOption;
+                    }
+                }
+                $scope.answerFile = function(Id,option) {
+                    $scope.ansFileId = Id;
+                    $scope.ansFileOption = option;
+                }
+                $scope.fileChanged1 = function(ele) {
+                    var files = ele.files;
+                    var l = files.length; 
+                    if(l > 0) {
+                       $scope.response[$scope.ansFileId] = $scope.ansFileOption;
+                    }
+                }
+                $scope.hotspotInit = function(hotspotProperties) {
+                    if (hotspotProperties != null && hotspotProperties != '') {
+                        return JSON.parse(_.unescape(hotspotProperties));
+                    } else {
+                        return null;
+                    }
+                }
+                $scope.ListQuestionType = function(option,wholeOption,index) {
+                     
+                     var arrList = wholeOption.ExAM__Subquestion_Label__c.split('~'); 
+                     for(var i=0;i<arrList.length;i++) {
+                         if(i==index) {
+                            $('#listQT'+wholeOption.Id+i).addClass('slds-is-selected'); 
+                         } else {
+                             $('#listQT'+wholeOption.Id+i).removeClass('slds-is-selected');
+                         }    
+                     }
+                     $scope.response[wholeOption.Id] = option;
+                }
+            });
+            
+        </script>
+        <div ng-app="viewerApp" ng-controller="viewerCtrl" class="slds">
+            <br/>
+            <div class="slds-tabs--scoped">
+                <ul class="slds-tabs--scoped__nav" role="tablist" id="tabId">
+                    <li class="slds-tabs__item slds-text-heading--label slds-active" role="presentation" id="tab1">
+                        <a title="Assessment" href="#" role="tab" tabindex="0" aria-selected="true" aria-controls="tab-scoped-1" ng-click="callTabViewChangeFn($event);">Assessment</a>
+                    </li>
+                    <li class="slds-tabs__item slds-text-heading--label" role="presentation" id="tab2" ng-show="showAssignmentManager" >
+                        <a title="Assignment Manager" href="#" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-scoped-2" ng-click="callTabViewChangeFn($event);">Assignment Manager</a>
+                    </li>
+                    <li class="slds-tabs__item slds-text-heading--label" role="presentation" id="tab3" ng-show="showAssignmentManagerList" >
+                        <a title="Assignment Manager List" href="#" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-scoped-3" ng-click="callTabViewChangeFn($event);">Assignment Manager List</a>
+                    </li>
+                    <li class="slds-tabs__item slds-text-heading--label" role="presentation" id="tab4" ng-show="showDataManagement" >
+                        <a title="Data Management" href="#" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-scoped-4" ng-click="callTabViewChangeFn($event);">Data Management</a>
+                    </li>
+                </ul>
+                
+                <!--Start new changes for mobile response view 23-06-2016 -->
+                <div class="slds-dropdown-trigger slds-dropdown-trigger--click slds-is-open" aria-expanded="true" aria-selected="true" id="dropdownListId">
+                  <button class="slds-button slds-button--icon-border-filled" aria-haspopup="true" ng-click="showMenu()">
+                    <svg aria-hidden="true" class="slds-button__icon">
+                      <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/utility-sprite/svg/symbols.svg#down')}"></use>
+                    </svg>
+                    <span class="slds-assistive-text">Show More</span>
+                  </button>
+                  <div class="slds-dropdown slds-dropdown--left" id="menuId">
+                    <ul class="dropdown__list" role="menu">
+                      <li class="slds-dropdown__item slds-active" role="menuitem" id="tab1">
+                        <a title="Assessment" href="#" ng-click="callTabViewChangeFn($event);">
+                          Assessment
+                        </a>
+                      </li>
+                      <li class="slds-dropdown__item" role="menuitem" id="tab2" ng-show="showAssignmentManager" >
+                        <a title="Assignment Manager" href="#" ng-click="callTabViewChangeFn($event);">
+                          Assignment Manager
+                        </a>
+                      </li>
+                      <li class="slds-dropdown__item" role="menuitem" id="tab3" ng-show="showAssignmentManagerList">
+                        <a title="Assignment Manager List" href="#" ng-click="callTabViewChangeFn($event);">
+                          Assignment Manager List
+                        </a>
+                      </li>
+                      <li class="slds-dropdown__item" role="menuitem" id="tab4" ng-show="showDataManagement" >
+                        <a title="Data Management" href="#" ng-click="callTabViewChangeFn($event);">
+                          Data Management
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <!-- End new changes for mobile response view 23-06-2016 -->
+                
+                <div id="tabpanel1" class="slds-tabs__content slds-hide slds-show" role="tabpanel">
+                    <div class="successmessage" style="display:none;">
+                        <p style="color:green;font-weight:bold;padding: 7px"> Answer created successfully </p>
+                    </div>
+                    <div class="errormessage" style="display:none;">
+                        <p style="color: red;font-weight:bold;padding: 7px">Please enter answer for any of the available questions and then save the record</p>
+                    </div>
+                    <div class="errmessage" style="display:none;color: red;font-weight:bold;padding: 7px"></div>
+                    <img src="/servlet/servlet.FileDownload?file={!bannerId}" ng-show="bannershow != ''" style="width:100%"/>
+                    <br/>              
+                    <br/>
+                    <button class="slds-button" onclick="opendialog();" ng-show="Show_Configuration_Options_in_Viewer" style="background-color: #BDB76B;float: right;">
+                        <img src="{!URLFOR($Resource.SLDS052, '/assets/icons/standard/poll_60.png')}" style="width: 35px;"/>
+                    </button>
+
+                    <div aria-hidden="false" role="dialog" class="slds-modal slds-modal__close generalConfig" style="background-color: rgba(128, 128, 128, 0.75);">
+                        <div class="slds-modal__container">
+                            <div class="slds-modal__header">
+                                <h2 class="slds-text-heading--medium">Viewer Configuration</h2>
+                                <button class="slds-button slds-button--icon-inverse slds-modal__close" onclick="closedialog();">
+                                    <svg aria-hidden="true" class="slds-button__icon slds-button__icon--large">
+                                        <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#close')}"></use>
+                                    </svg>
+                                    <span class="slds-assistive-text">Close</span>
+                                </button>
+                            </div>
+                            <div class="slds-modal__content">
+                                <table class="slds-table slds-table--bordered slds-max-medium-table--stacked" >
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-cell-wrap" data-label="Hierarchical Object">
+                                            <label class="slds-checkbox" for="chkHierarchicalObjectId">
+                                                <input name="checkbox" type="checkbox" id="chkHierarchicalObjectId" ng-model="config.ExAM__Hierarchical_Object__c"/>
+                                                <span class="slds-checkbox--faux"></span>
+                                                <span class="slds-form-element__label">Hierarchical Object</span>
+                                            </label>
+                                        </td>
+                                        <td class="slds-cell-wrap" data-label="Data Management">
+                                            <label class="slds-checkbox" for="chkDataManagementId">
+                                                <input name="checkbox" type="checkbox" id="chkDataManagementId" ng-model="config.ExAM__Data_Management__c"/>
+                                                <span class="slds-checkbox--faux"></span>
+                                                <span class="slds-form-element__label">Data Management</span>
+                                            </label>
+                                        </td>
+                                    </tr>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-cell-wrap" data-label="Answer option">
+                                            <label class="slds-checkbox" for="chkAnswerOptionsId">
+                                                <input name="checkbox" type="checkbox" id="chkAnswerOptionsId" ng-model="config.ExAM__Answer_Options__c" />
+                                                <span class="slds-checkbox--faux"></span>
+                                                <span class="slds-form-element__label">Answer Options</span>
+                                            </label>
+                                        </td>
+                                        <td class="slds-cell-wrap" data-label="Assignment Manager">
+                                            <label class="slds-checkbox" for="chkAssignmentManagerId">
+                                                <input name="checkbox" type="checkbox" id="chkAssignmentManagerId" ng-model="config.ExAM__Assignment_Manager__c" />
+                                                <span class="slds-checkbox--faux"></span>
+                                                <span class="slds-form-element__label">Assignment Manager</span>
+                                            </label>
+                                        </td>
+                                    </tr>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-cell-wrap" data-label="Single Question Mode">
+                                            <label class="slds-checkbox" for="chkSingleQuestionModeId">
+                                                <input name="checkbox" type="checkbox" id="chkSingleQuestionModeId" ng-model="config.ExAM__Single_Question_Mode__c" />
+                                                <span class="slds-checkbox--faux"></span>
+                                                <span class="slds-form-element__label">Single Question Mode</span>
+                                            </label>
+                                        </td>
+                                        <td class="slds-cell-wrap" data-label="Assignment Manager List">
+                                            <label class="slds-checkbox" for="chkAssignmentManagerListId">
+                                                <input name="checkbox" type="checkbox" id="chkAssignmentManagerListId" ng-model="config.ExAM__Assignment_Manager_List__c" />
+                                                <span class="slds-checkbox--faux"></span>
+                                                <span class="slds-form-element__label">Assignment Manager List</span>
+                                            </label>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <div class="slds-m-bottom--medium"></div>          
+                                
+                                <div class="slds-size--1-of-1" style="text-align:center;">
+                                    <button class="slds-button slds-button--brand"  ng-click="loadconfig(configId)">Load</button>
+                                </div>
+                                <div class="slds-m-bottom--medium"></div>
+                                <div class="slds-m-bottom--medium"></div>
+                                    
+                            </div>
+                            <div class="slds-modal__footer">
+                                <!--<button class="slds-button slds-button--neutral" onclick="closedialog();">Cancel</button>
+                                
+                                <input class="slds-button slds-button--brand" type="button" value="Save" ng-click="savedialog();"/>-->            
+                                <!--<button class="slds-button slds-button--neutral slds-button--brand" ng-onclick="savedialog();">Save</button>-->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!--<apex:selectList id="AssessTemplates" value="{!templateid}" size="1" onchange="updateTemplate(this.value)" >
+                        <apex:selectOptions value="{!templateLists}"/> 
+                    </apex:selectList>
+                    -->
+                    
+                        <input type="text" ng-show="showHierarchical" class="slds-input slds-col--padded slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--4-of-12" disabled="disabled" ng-model="hierarchicalrecordNames" placeholder="Hierarchical" style="margin-bottom: 10px;"/>
+                        <input type="hidden" ng-model="hierarchicalrecordIds"/>
+                        <span ng-show="showHierarchical" class="slds-icon__container slds-align-middle slds-p-right--medium">
+                            <svg aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-marketing-actions slds-icon--small" ng-click="openHierarchical()">
+                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#marketing_actions')}"></use>
+                            </svg>
+                        </span>
+                    
+                    <select class="slds-select slds-col--padded slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--4-of-12" id="sectionTempId" ng-model="sectionselectedvalue" ng-change="sectionchange()" ng-options="section.Id as section.ExAM__Section_label__c for section in sections" style="margin-bottom: 10px;">
+                    </select>
+                    <select class="slds-select  slds-col--padded slds-size--1-of-1 slds-medium-size--1-of-2 slds-large-size--3-of-12" id="questionId" ng-show="showSingleQuestion" ng-change="change()" ng-model="showedquestion" ng-options="q.questionTemplate.Id as q.questionTemplate.ExAM__Question_Label__c for q in questionsTemp"></select>
+                    <div class="slds-m-top--medium slds-col--padded slds-size--1-of-1 slds-medium-size--1-of-2 slds-large-size--1-of-1" style="text-align:center;">
+                        <input class="slds-button slds-button--brand" type="button" value="Save" ng-click="saveQuestion(false);"/>
+                        <input class="slds-button slds-button--brand" type="button" value="Save & Submit" ng-click="saveQuestion(true);"/>
+                    </div>
+                    <br/>
+                    <div class="row">                                
+                        <div ng-repeat="question in questions | filter:sectionselectedvalue | filter:showedquestion" ng-hide="((showedquestion =='' && showSingleQuestion))">
+                            <div ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Text' || question.questionTemplate.ExAM__Question_Type__c == 'Email' || question.questionTemplate.ExAM__Question_Type__c == 'Phone Number' " class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b> <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label> <b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;"  src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                    <input ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Text' " class="slds-col slds-size--4-of-12 slds-input validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" type="text" ng-model="response[question.questionTemplate.Id]" maxLength="{{question.questionTemplate.ExAM__Field_Length__c}}" />
+                                    <input ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Email' " class="slds-col slds-size--4-of-12 slds-input validateEmail validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" type="text" ng-model="response[question.questionTemplate.Id]" />
+                                    <input ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Phone Number' " class="slds-col slds-size--4-of-12 slds-input validatePhone validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" id="{{question.questionTemplate.Id}}" type="text" ng-model="response[question.questionTemplate.Id]" />
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span style="font-style: italic;font-size: 12px;" ng-if="question.questionTemplate.ExAM__Field_Length__c != null && question.questionTemplate.ExAM__Field_Length__c != ''"> {{question.questionTemplate.ExAM__Field_Length__c-response[question.questionTemplate.Id].length}} of {{question.questionTemplate.ExAM__Field_Length__c}} characters left</span>
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                        <span class="slds-form-element__help validateEmailMessage" style="color:#C23934;display:none;">Invalid Email Address</span>
+                                        <span class="slds-form-element__help validatePhNumMessage" style="color:#C23934;display:none;">Invalid Phone Number</span>
+                                    </div>
+                                </div> 
+                            </div>
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c=='Textarea' " class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;"  src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                    <textarea rows="4" ng-model="response[question.questionTemplate.Id]" cols="50" class="slds-col slds-size--4-of-12 slds-textarea validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" maxLength="{{question.questionTemplate.ExAM__Field_Length__c}}" />
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span style="font-style: italic;font-size: 12px;" ng-if="question.questionTemplate.ExAM__Field_Length__c != null && question.questionTemplate.ExAM__Field_Length__c != ''"> {{question.questionTemplate.ExAM__Field_Length__c-response[question.questionTemplate.Id].length}} of {{question.questionTemplate.ExAM__Field_Length__c}} characters left</span>
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div> 
+                            </div>
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c=='Date' " class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;"  src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                    <input type="text" ng-model="response[question.questionTemplate.Id]" class="datepicker slds-input slds-col slds-size--4-of-12 validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" />
+                                    <script>
+                                        $(function() {
+                                            $( ".datepicker" ).datepicker();
+                                        });
+                                    </script>
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c=='Dropdown Picklist' " class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;"  src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                    <div class="slds-col slds-size--4-of-12">    
+                                        <select id="sectionTempId" ng-value="section"  ng-change="decisionTreeOpenWindow(question.isdecisionTree, response[question.questionTemplate.Id], question.questionTemplate);returnRelatedDependentQuestion(question.questionTemplate, response[question.questionTemplate.Id]);" 
+                                                class="slds-select validatepicklist{{question.questionTemplate.ExAM__Is_Mandatory__c}}" ng-model="response[question.questionTemplate.Id]" 
+                                                ng-options="section as section for section in splitOptions(question.questionTemplate.ExAM__Subquestion_Label__c)">
+                                        </select>
+                                    </div>
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span> 
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c == 'RadioPicklist' " class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>                                    
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;"  src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                    <div class="slds-col slds-size--4-of-12">
+                                        <label class="slds-radio validateradio{{question.questionTemplate.ExAM__Is_Mandatory__c}}" ng-repeat="option in splitOptions(question.questionTemplate.ExAM__Subquestion_Label__c)">
+                                            <input type="radio" ng-model="response[question.questionTemplate.Id]" ng-value="option" ng-change="decisionTreeOpenWindow(question.isdecisionTree, response[question.questionTemplate.Id], question.questionTemplate);returnRelatedDependentQuestion(question.questionTemplate, response[question.questionTemplate.Id]);"/> 
+                                            <span class="slds-radio--faux"></span>
+                                            <span class="slds-form-element__label">{{option}}</span>
+                                        </label>
+                                    </div>
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div> 
+                            </div>
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c=='MultiselectPicklist'" class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label> 
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;"  src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>                                   
+                                <div style="padding-bottom:15px;"  class="slds-grid slds-wrap" >
+                                    <div class="slds-col slds-size--4-of-12">
+                                        <label class="slds-checkbox" ng-repeat="option in splitOptions(question.questionTemplate.ExAM__Subquestion_Label__c)">
+                                            <input class="validatecheckbox{{question.questionTemplate.ExAM__Is_Mandatory__c}}" type="checkbox" ng-model="response[question.questionTemplate.Id][option]" />
+                                            <span class="slds-checkbox--faux"></span>
+                                            <span class="slds-form-element__label">{{option}}</span>
+                                        </label>
+                                    </div>
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}" ></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Image' " class="col-md-12">
+                                <label for="QuestionTempLabel">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;" src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                    <div class="slds-col slds-size--4-of-12 imageValidate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" id="{{question.questionTemplate.Id}}">
+                                        <div id = "imageId" ng-repeat="temp in dependentQuestionsAttObj[question.questionTemplate.Id]" style=" display: inline-block;">
+                                            <span class="slds-avatar slds-avatar--medium">
+                                                <img id="{{temp.recId}}" src="{{temp.url}}" class="imgStyle" ng-click ="imageTypeQues(question.questionTemplate, $index, $event, dependentQuestionsAttObj[question.questionTemplate.Id], temp.recId)"/>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span> 
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c=='Button' " class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>    
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;"  src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>                                
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                    <div class="slds-col slds-size--4-of-12 slds-grid validateBtn{{question.questionTemplate.ExAM__Is_Mandatory__c}}" id="Btn{{question.questionTemplate.Id}}">
+                                        <div class="slds-button-group" ng-repeat="option in optionsArr = splitOptions(question.questionTemplate.ExAM__Subquestion_Label__c)" role="group">
+                                            <button class="slds-button slds-button--neutral btnStyle" ng-model="response[question.questionTemplate.Id]" id="{{$index}}{{question.questionTemplate.Id}}" ng-click="setSelectedOption(question.questionTemplate, option, optionsArr, false);decisionTreeOpenWindow(question.isdecisionTree, response[question.questionTemplate.Id], question.questionTemplate);">{{option}}</button>
+                                        </div>
+                                    </div>
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div> 
+                            </div>
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c=='File Question - AM' " class="col-md-12">
+                                <label>
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" class="mandatory" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>      
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;" src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>                              
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                    <input class="slds-col slds-size--4-of-12  validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" type="file" data-file="responseFile[question.questionTemplate.Id]"/>
+                                    <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                </div> 
+                            </div>
+                            <div  ng-if="question.questionTemplate.ExAM__Question_Type__c=='File Question - Answer' " class="col-md-12">
+                                <label>
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b>  <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" class="mandatory" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>  
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;" src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>                                  
+                                <div style="padding-bottom:15px;" class="slds-grid slds-wrap" ng-click ="answerFile(question.questionTemplate.Id,question.questionTemplate.ExAM__Subquestion_Label__c)">
+                                    <input class="slds-col slds-size--4-of-12  validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" type="file" data-file="fileAttach[question.questionTemplate.Id]" onchange="angular.element(this).scope().fileChanged(this)"/>
+                                    <span class="slds-col slds-size--12-of-12 slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                </div> 
+                            </div>
+                            <!--add on 16-09-2016-->
+                            <div ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Signature'" class="col-md-12">
+                                <label>
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b> <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" class="mandatory" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;" src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div style="padding-bottom:15px;" class="slds-grid validateSignImage{{question.questionTemplate.ExAM__Is_Mandatory__c}}">
+                                    <div class="slds-col slds-size--1-of-12">
+                                        <button id="sign{{question.questionTemplate.Id}}" class="slds-button slds-button--neutral validateSign" ng-click="openSignatureModal(question.questionTemplate.Id,question.questionTemplate.ExAM__Subquestion_Label__c)" style="margin-top:10px;">Signature</button>
+                                    </div>
+                                    <div class="slds-col slds-size--2-of-12" style="margin-right: 20px;">
+                                        <div class="slds-box slds-box--x-small slds-text-align--center slds-m-around--x-small" ng-if="signImage[question.questionTemplate.Id] != null">
+                                            <img class="signImage" src="{{signImage[question.questionTemplate.Id]}}" height="200px" width="200px"/>
+                                        </div>
+                                    </div>
+                                    <div class="slds-col slds-size--8-of-12"/>
+                                </div> 
+                                <div class="slds-grid slds-col slds-size--1-of-2">
+                                    <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                </div>
+                            </div>
+                            
+                            <div ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Hotspot Image'" class="col-md-12">
+                                <label>
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b> <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" class="mandatory" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;" src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div id="hotspot{{question.questionTemplate.Id}}" style="padding-bottom:15px;" class="slds-grid hotspotImage{{question.questionTemplate.ExAM__Is_Mandatory__c}}">
+                                    <div class="slds-col" ng-init="hotspot[question.questionTemplate.Id] = hotspotInit(question.questionTemplate.ExAM__Hotspot_Image_Properties__c)">
+                                        <div ng-if="hotspot[question.questionTemplate.Id] != null">
+                                            <img class="map" src="/servlet/servlet.FileDownload?file={{hotspot[question.questionTemplate.Id].questionImageId}}" usemap="#{{hotspot[question.questionTemplate.Id].questionImageId}}" alt="" width="{{hotspot[question.questionTemplate.Id].imageWidth}}" style="height:{{hotspot[question.questionTemplate.Id].imageHeight}}px" />
+                                            <map class="tabs" name="{{hotspot[question.questionTemplate.Id].questionImageId}}"  >
+                                                <area ng-repeat="area in hotspot[question.questionTemplate.Id].area" shape="{{area.shape}}" coords="{{area.coords}}"  ng-click="response[question.questionTemplate.Id] = area.areaValue" title="{{area.areaValue}}" alt="{{area.areaValue}}" />
+                                            </map>
+                                        </div>
+                                    </div>
+                                </div> 
+                                <div class="slds-grid slds-col slds-size--1-of-2">
+                                    <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                </div>
+                            </div>
+                            
+                            <div ng-if="question.questionTemplate.ExAM__Question_Type__c=='List' " class="col-md-12">
+                                <label for="exampleInputEmail1">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}</b> <label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label><b style="color:#C23934;" class="mandatory" ng-show="question.questionTemplate.ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="question.questionTemplate.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{question.questionTemplate.Id}}">{{ question.questionTemplate.ExAM__HelpText__c }}</span>
+                                </label>                                    
+                                <div ng-if="question.QuestionAttachmentId != null && question.QuestionAttachmentId != ''">
+                                    <img style="margin: 10px 10px 10px 0px;max-width: 100%;height: auto;width: auto;" src="/servlet/servlet.FileDownload?file={{question.QuestionAttachmentId}}"/>
+                                </div>
+                                <div class="slds-grid slds-wrap" style="padding-top:10px;padding-bottom:15px;">
+                                    <div class="slds-col slds-size--4-of-12 ListQType{{question.questionTemplate.ExAM__Is_Mandatory__c}}" style="background-color:#F4F6F9;" Id="ListQType{{question.questionTemplate.Id}}">
+                                        <ul class="slds-list--vertical slds-has-dividers--top-space slds-has-list-interactions">
+                                            <li id="listQT{{question.questionTemplate.Id}}{{$index}}" class="slds-list__item liClass" ng-repeat="option in splitOptions(question.questionTemplate.ExAM__Subquestion_Label__c)" ng-click="ListQuestionType(option,question.questionTemplate,$index);">{{option}}</li>
+                                        </ul>
+                                    </div>
+                                    <div class="slds-col slds-size--8-of-12">
+                                        <span ng-show="!question.questionTemplate.ExAM__Do_Not_Create_Answer__c" class="slds-icon__container slds-align-middle slds-p-left--medium">
+                                            <svg ng-show="showImageUploadIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-photo slds-icon--small" ng-click="openPhotoUpload(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#photo')}"></use>
+                                            </svg>
+                                            <svg ng-show="showCommentsIcon" aria-hidden="true" class="slds-icon icon__svg slds-icon-standard-note slds-icon--small" ng-click="opencomment(question.questionTemplate.Id)">
+                                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/standard-sprite/svg/symbols.svg#note')}"></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                </div> 
+                            </div>
+                            
+                            <!-- Case question type start 02-11-2016-->
+                            <div ng-if="question.questionTemplate.ExAM__Question_Type__c == 'Case'" class="col-md-12">
+                                <label class="slds-checkbox" style="margin-left: 2%">
+                                    <input type="checkbox" name="options" id="checkbox-01" ng-model="caseResponse[question.questionTemplate.Id].isCheck"/>
+                                    <span class="slds-checkbox--faux"></span>
+                                    <span class="slds-form-element__label"><label ng-bind-html="question.questionTemplate.ExAM__Question_Label__c"></label></span>
+                                </label>
+                                <div ng-if="caseResponse[question.questionTemplate.Id].isCheck" class="slds-grid slds-wrap slds-grid--pull-padded">
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--3-of-12 slds-align-middle" style="text-align:right;">
+                                        <label class="slds-form-element__label" for="text-input-01">Name<b style="color:#C23934;"> *</b></label>
+                                    </div>
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--9-of-12">
+                                        <input type="text" ng-model="caseResponse[question.questionTemplate.Id].Name" class="caseValidate{{caseResponse[question.questionTemplate.Id].isCheck}} slds-input slds-size--1-of-1 slds-medium-size--4-of-6 slds-large-size--6-of-12 slds-m-around--xx-small"/>
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--3-of-12 slds-align-middle" style="text-align:right;">
+                                        <label class="slds-form-element__label" for="text-input-01">Email<b style="color:#C23934;"> *</b></label>
+                                    </div>
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--9-of-12">
+                                        <input type="text" ng-model="caseResponse[question.questionTemplate.Id].Email" class="caseEmailValidate{{caseResponse[question.questionTemplate.Id].isCheck}} caseValidate{{caseResponse[question.questionTemplate.Id].isCheck}} slds-input slds-size--1-of-1 slds-medium-size--4-of-6 slds-large-size--6-of-12 slds-m-around--xx-small"/>
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                        <span class="slds-form-element__help requiredEmailMessage" style="color:#C23934;display:none;">Invalid Email Address</span>
+                                    </div>
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--3-of-12 slds-align-middle" style="text-align:right;">
+                                        <label class="slds-form-element__label" for="text-input-01">Subject<b style="color:#C23934;"> *</b></label>
+                                    </div>
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--9-of-12">
+                                        <input type="text" ng-model="caseResponse[question.questionTemplate.Id].Subject" class="caseValidate{{caseResponse[question.questionTemplate.Id].isCheck}} slds-input slds-size--1-of-1 slds-medium-size--4-of-6 slds-large-size--6-of-12 slds-m-around--xx-small"/>
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                    </div>
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--3-of-12 slds-align-middle" style="text-align:right;">
+                                        <label class="slds-form-element__label" for="text-input-01">Description</label>
+                                    </div>
+                                    <div class="slds-col--padded slds-size--1-of-2 slds-medium-size--3-of-6 slds-large-size--9-of-12">
+                                        <input type="text" ng-model="caseResponse[question.questionTemplate.Id].Descrip" class="slds-input slds-size--1-of-1 slds-medium-size--4-of-6 slds-large-size--6-of-12 slds-m-around--xx-small"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- End Case question type-->
+                            <!-- Dependent Question Rendering Code Starts -->
+                            <div ng-if="nextDependentQuestion[question.questionTemplate.Id]" class="dependentQuestDivStyle">
+                                <label for="{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Label__c}}">
+                                    <b ng-show="showQuesNumIcon">Q.{{$index+1}}i</b>  <label ng-bind-html="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Label__c"></label><b style="color:#C23934;" ng-show="nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c"> *</b>
+                                    <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                    <span class="vfHelpText" id="{{nextDependentQuestion[question.questionTemplate.Id].Name}}">{{ nextDependentQuestion[question.questionTemplate.Id].ExAM__HelpText__c }}</span>
+                                </label>
+                                <div class="slds-grid slds-wrap">
+                                    <input ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Text' " class="slds-size--4-of-12 slds-input validate{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" type="text" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" maxLength="{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Field_Length__c}}"/>
+                                    <input ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Email' " class="slds-size--4-of-12 slds-input validateEmail validate{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" type="text" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" />
+                                    <input ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Phone Number' " class="slds-size--4-of-12 slds-input validatePhone validate{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" id="{{nextDependentQuestion[question.questionTemplate.Id].Id}}"  type="text" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" />
+                                    <textarea ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Textarea' " rows="4" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" cols="50" class="slds-size--4-of-12 slds-textarea validate{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" maxLength="{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Field_Length__c}}" />
+                                    <input ng-show="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Date' " type="text" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" class="datepicker slds-input slds-size--4-of-12 validate{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" />
+                                    <script>
+                                        $(function() {
+                                            $( ".datepicker" ).datepicker();
+                                        });
+                                    </script>
+                                    <div ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Dropdown Picklist' " class="slds-size--4-of-12">
+                                        <select id="sectionTempId" class="slds-select validatepicklist{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" ng-options="section as section for section in splitOptions(nextDependentQuestion[question.questionTemplate.Id].ExAM__Subquestion_Label__c)">
+                                        </select>
+                                    </div>
+                                    <div ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='RadioPicklist' " class="slds-col slds-size--4-of-12">
+                                        <label class="slds-radio validateradio{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" ng-repeat="option in splitOptions(nextDependentQuestion[question.questionTemplate.Id].ExAM__Subquestion_Label__c)">
+                                            <input type="radio" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" ng-value="option"/> 
+                                            <span class="slds-radio--faux"></span>
+                                            <span class="slds-form-element__label">{{option}}</span>
+                                        </label>
+                                    </div>
+                                    <div ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='MultiselectPicklist' " class="slds-col slds-size--4-of-12">
+                                        <label class="slds-checkbox validatecheckbox{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" ng-repeat="option in splitOptions(nextDependentQuestion[question.questionTemplate.Id].ExAM__Subquestion_Label__c)">
+                                            <input type="checkbox" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id][option]"/> 
+                                            <span class="slds-checkbox--faux"></span>
+                                            <span class="slds-form-element__label">{{option}}</span>
+                                        </label>
+                                    </div>
+                                    <div ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Image' " class="slds-col slds-size--4-of-12 imageValidate{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" id="{{nextDependentQuestion[question.questionTemplate.Id].Id}}">
+                                        <div id = "imageId" ng-repeat="temp in dependentQuestionsAttObj[nextDependentQuestion[question.questionTemplate.Id].Id]" style=" display: inline-block;"> 
+                                            <span class="slds-avatar slds-avatar--medium">
+                                                <img id="{{temp.recId}}" class="imgStyle" src="{{temp.url}}" ng-click ="imageTypeQues(nextDependentQuestion[question.questionTemplate.Id], $index, $event, dependentQuestionsAttObj[nextDependentQuestion[question.questionTemplate.Id].Id], temp.recId)"/>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Question_Type__c=='Button' " class="slds-col slds-size--4-of-12 slds-grid validateBtn{{nextDependentQuestion[question.questionTemplate.Id].ExAM__Is_Mandatory__c}}" id="Btn{{nextDependentQuestion[question.questionTemplate.Id].Id}}">
+                                        <div class="slds-button-group" ng-repeat="option in optionsArr = splitOptions(nextDependentQuestion[question.questionTemplate.Id].ExAM__Subquestion_Label__c)" role="group">
+                                            <button class="slds-button slds-button--neutral btnStyle" ng-model="response[nextDependentQuestion[question.questionTemplate.Id].Id]" id="{{$index}}{{nextDependentQuestion[question.questionTemplate.Id].Id}}" ng-click="setSelectedOption(nextDependentQuestion[question.questionTemplate.Id], option, optionsArr, false);">{{option}}</button>
+                                        </div>
+                                    </div>
+                                    <div class="slds-col slds-size--12-of-12">
+                                        <span style="font-style: italic;font-size: 12px;" ng-if="nextDependentQuestion[question.questionTemplate.Id].ExAM__Field_Length__c != null && nextDependentQuestion[question.questionTemplate.Id].ExAM__Field_Length__c != ''"> {{nextDependentQuestion[question.questionTemplate.Id].ExAM__Field_Length__c - response[nextDependentQuestion[question.questionTemplate.Id].Id].length}} of {{nextDependentQuestion[question.questionTemplate.Id].ExAM__Field_Length__c}} characters left</span>
+                                        <span class="slds-form-element__help requiredMessage" style="color:#C23934;display:none;">This field is required</span>
+                                        <span class="slds-form-element__help validateEmailMessage" style="color:#C23934;display:none;">Invalid Email Address</span>
+                                        <span class="slds-form-element__help validatePhNumMessage" style="color:#C23934;display:none;">Invalid Phone Number</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Dependent Question Rendering Code Ends -->
+
+                        </div>                                
+                    </div>
+                    
+                    <!-- comment box-->
+                      <div aria-hidden="false" role="dialog" class="slds-modal slds-modal__close answercomment" style="background-color: rgba(128, 128, 128, 0.75);">
+                        <div class="slds-modal__container">
+                          <div class="slds-modal__header">
+                            <h2 class="slds-text-heading--medium">Comment Note</h2>
+                            <button class="slds-button slds-button--icon-inverse slds-modal__close" ng-click="closecomment()">
+                              <svg aria-hidden="true" class="slds-button__icon slds-button__icon--large">
+                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#close')}"></use>
+                              </svg>
+                              <span class="slds-assistive-text">Close</span>
+                            </button>
+                          </div>
+                          <div class="slds-modal__content">
+                            <div>
+                              <textarea class="slds-textarea" placeholder="Comment Text" ng-model="comment[selecteQuestionId]"></textarea>
+                            </div>
+                          </div>
+                          <div class="slds-modal__footer">
+                            <button class="slds-button slds-button--neutral" ng-click="closecomment()">Cancel</button>
+                            <button class="slds-button slds-button--neutral slds-button--brand" ng-click="savecomment()">Save</button>
+                          </div>
+                        </div>
+                      </div>
+                    <!--End comment box-->
+                    
+                    <!-- file upload box-->
+                      <div aria-hidden="false" role="dialog" class="slds-modal slds-modal__close photoUpload" style="background-color: rgba(128, 128, 128, 0.75);">
+                        <div class="slds-modal__container">
+                          <div class="slds-modal__header">
+                            <h2 class="slds-text-heading--medium">Photo Upload</h2>
+                            <button class="slds-button slds-button--icon-inverse slds-modal__close" ng-click="closePhotoUpload()">
+                              <svg aria-hidden="true" class="slds-button__icon slds-button__icon--large">
+                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#close')}"></use>
+                              </svg>
+                              <span class="slds-assistive-text">Close</span>
+                            </button>
+                          </div>
+                          <div class="slds-modal__content">
+                            <div>
+                              <input type="file" id="fid" data-file="photo[photoQuestionId]"/>
+                            </div>
+                          </div>
+                          <div class="slds-modal__footer">
+                            <button class="slds-button slds-button--neutral" ng-click="closePhotoUpload()">Cancel</button>
+                            <button class="slds-button slds-button--neutral slds-button--brand" ng-click="savePhoto()">Upload</button>
+                          </div>
+                        </div>
+                      </div>
+                    <!--End file Upload box-->
+                    <!--add on 16-09-2016-->
+                    <!-- Start Signature modal -->
+                    <div aria-hidden="false" role="dialog" class="slds-modal slds-modal__close sign" style="background-color: rgba(128, 128, 128, 0.75);">
+                        <div class="slds-modal__container">
+                            <div class="slds-modal__header">
+                                <h2 class="slds-text-heading--medium">Signature</h2>
+                                <button class="slds-button slds-button--icon-inverse slds-modal__close" ng-click="closeSign()">
+                                    <svg aria-hidden="true" class="slds-button__icon slds-button__icon--large">
+                                        <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#close')}"></use>
+                                    </svg>
+                                    <span class="slds-assistive-text">Close</span>
+                                </button>
+                            </div>
+                            <div class="slds-modal__content">
+                                <div class="slds-grid slds-grid--align-center">
+                                    <canvas id="canvas{{chooseQuesId}}" style="border: 1px solid #A7C6FC; border-color:#ccc;" ng-click="canvasClickfunction();"/>
+                                </div>
+                            </div>
+                            <div class="slds-modal__footer">
+                                <button class="slds-button slds-button--neutral" ng-click="clearSign()">Clear</button>
+                                <button class="slds-button slds-button--neutral slds-button--brand" ng-click="saveSign()">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- End Signature modal -->
+                    <!-- Start Hierarchical select-->
+                      <div aria-hidden="false" role="dialog" class="slds-modal slds-modal__close Hierarchical" style="background-color: rgba(128, 128, 128, 0.75);">
+                        <div class="slds-modal__container">
+                          <div class="slds-modal__header">
+                            <h2 class="slds-text-heading--medium">Hierarchical Object</h2>
+                            <button class="slds-button slds-button--icon-inverse slds-modal__close" ng-click="closeHierarchical()">
+                              <svg aria-hidden="true" class="slds-button__icon slds-button__icon--large">
+                                <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#close')}"></use>
+                              </svg>
+                              <span class="slds-assistive-text">Close</span>
+                            </button>
+                          </div>
+                          <div class="slds-modal__content">
+                            <div>
+                              <select class="slds-select slds-size--9-of-12" style="height:100px" id="hierarchicalObject" ng-show="true" ng-model="hierarchicalIdwithNames" ng-options="h.recordId+'~'+h.recordName as h.recordName for h in hierarchicalObj" multiple="multiple"></select>
+                            </div>
+                          </div>
+                          <div class="slds-modal__footer">
+                            <button class="slds-button slds-button--neutral" ng-click="closeHierarchical()">Cancel</button>
+                            <button class="slds-button slds-button--neutral slds-button--brand" ng-click="saveHierarchical()">Ok</button>
+                          </div>
+                        </div>
+                      </div>
+                    <!--End Hierarchical select-->
+                    
+                    <!-- Start Decision Tree-->
+                    <div aria-hidden="false" role="dialog" class="slds-modal slds-modal__close DecisionTree" style="background-color: rgba(128, 128, 128, 0.75);">
+                        <div class="slds-modal__container">
+                            <button class="slds-button slds-button--icon-inverse slds-modal__close" ng-click="closeDecisionTree()">
+                                <svg aria-hidden="true" class="slds-button__icon slds-button__icon--large">
+                                    <use xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#close')}"></use>
+                                </svg>
+                                <span class="slds-assistive-text">Close</span>
+                            </button>
+                            <div class="slds-modal__content">
+                                <div>
+                                    <div ng-if="decisionTreeQuestion.ExAM__Question_Type__c=='Dropdown Picklist' " class="col-md-12">
+                                        <label for="exampleInputEmail1">
+                                            <b ng-if="showQuestionName_on_DecisionTree" >
+                                                <a ng-href="/{{decisionTreeQuestion.Id}}" target="_blank"><label style="cursor: pointer;" ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></a>
+                                            </b>
+                                            <b ng-if="!showQuestionName_on_DecisionTree" ><label ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></b>
+                                            <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="decisionTreeQuestion.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                            <span class="vfHelpText" id="{{decisionTreeQuestion.Id}}">{{ decisionTreeQuestion.ExAM__HelpText__c }}</span>
+                                        </label>
+                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                            <div class="slds-col slds-size--4-of-12">    
+                                                <select id="sectionTempId" ng-value="section"  class="slds-select" ng-model="DecisionTreeresponse[decisionTreeQuestion.Id]" ng-options="section as section for section in splitOptions(decisionTreeQuestion.ExAM__Subquestion_Label__c)"></select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div  ng-if="decisionTreeQuestion.ExAM__Question_Type__c == 'RadioPicklist' " class="col-md-12">
+                                        <label for="exampleInputEmail1">
+                                            <b ng-if="showQuestionName_on_DecisionTree" >
+                                                <a ng-href="/{{decisionTreeQuestion.Id}}" target="_blank"><label style="cursor: pointer;" ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></a>
+                                            </b>
+                                            <b ng-if="!showQuestionName_on_DecisionTree" ><label ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></b>
+                                            <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="decisionTreeQuestion.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                            <span class="vfHelpText" id="{{decisionTreeQuestion.Id}}">{{ decisionTreeQuestion.ExAM__HelpText__c }}</span>
+                                        </label>
+                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                            <div class="slds-col slds-size--4-of-12">
+                                                <label class="slds-radio" ng-repeat="option in splitOptions(decisionTreeQuestion.ExAM__Subquestion_Label__c)">
+                                                    <input type="radio" ng-model="DecisionTreeresponse[decisionTreeQuestion.Id]" ng-value="option" ng-change="indexfind($index);"/> 
+                                                    <span class="slds-radio--faux"></span>
+                                                    <span class="slds-form-element__label">{{option}}</span>
+                                                </label>
+                                            </div>
+                                        </div> 
+                                    </div>
+                                    <!--Start New code for Multi select checkbox - 23-08-2016 -->
+                        
+                                    <div  ng-if="decisionTreeQuestion.ExAM__Question_Type__c == 'MultiselectPicklist' " class="col-md-12">
+                                        <label for="exampleInputEmail1">
+                                            <b ng-if="showQuestionName_on_DecisionTree" >
+                                                <a ng-href="/{{decisionTreeQuestion.Id}}" target="_blank"><label style="cursor: pointer;" ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></a>
+                                            </b>
+                                            <b ng-if="!showQuestionName_on_DecisionTree" ><label ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></b>
+                                            <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="decisionTreeQuestion.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                            <span class="vfHelpText" id="{{decisionTreeQuestion.Name}}">{{ decisionTreeQuestion.ExAM__HelpText__c }}</span>
+                                        </label>
+                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                            <div class="slds-col slds-size--4-of-12">
+                                                <label class="slds-checkbox" ng-repeat="option in splitOptions(decisionTreeQuestion.ExAM__Subquestion_Label__c)">
+                                                    <input type="checkbox" ng-model="DecisionTreeresponse[decisionTreeQuestion.Id][option]"/> 
+                                                    <span class="slds-checkbox--faux"></span>
+                                                    <span class="slds-form-element__label">{{option}}</span>
+                                                </label>
+                                            </div>
+                                        </div> 
+                                    </div>
+                                    <!--End New code for Multi select checkbox - 23-08-2016 -->
+                                    <div  ng-if="decisionTreeQuestion.ExAM__Question_Type__c =='Button' " class="col-md-12">
+                                        <label for="exampleButton1">
+                                            <b ng-if="showQuestionName_on_DecisionTree" >
+                                                <a ng-href="/{{decisionTreeQuestion.Id}}" target="_blank"><label style="cursor: pointer;" ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></a>
+                                            </b>
+                                            <b ng-if="!showQuestionName_on_DecisionTree" ><label ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></b>
+                                            <img src="/img/alohaSkin/help_orange.png" alt="help" class="helpIcon" ng-if="decisionTreeQuestion.ExAM__HelpText__c" onmouseover="$(this).next().show();" onmouseout="$(this).next().hide();"/>
+                                            <span class="vfHelpText" id="{{decisionTreeQuestion.Name}}">{{ decisionTreeQuestion.ExAM__HelpText__c }}</span>
+                                        </label>
+                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                             <div class="slds-button-group " ng-repeat="option in optionsArr = splitOptions(decisionTreeQuestion.ExAM__Subquestion_Label__c)" role="group">
+                                                <button class="slds-button slds-button--neutral btnStyle" ng-model="DecisionTreeresponse[decisionTreeQuestion.Id]" id="{{$index}}{{decisionTreeQuestion.Id}}" ng-click="setSelectedOption(decisionTreeQuestion, option, optionsArr, true);">{{option}}</button>
+                                           
+                                            </div>
+                                        </div> 
+                                    </div>
+                                    <div  ng-if="decisionTreeQuestion.ExAM__Question_Type__c == 'Result' " class="col-md-12">
+                                        <label for="exampleInputEmail1">
+                                            <b ng-if="showQuestionName_on_DecisionTree" >
+                                                <a ng-href="/{{decisionTreeQuestion.Id}}" target="_blank"><label style="cursor: pointer;" ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></a>
+                                            </b>
+                                            <b ng-if="!showQuestionName_on_DecisionTree" ><label ng-bind-html="decisionTreeQuestion.ExAM__Question_Label__c"></label></b>
+                                        </label><br/><br/>
+                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                            <div class="slds-col slds-size--4-of-12">
+
+                                                <!-- start result template fields iteration -->
+                                                <div ng-repeat="eachResultField in decisionTreeResultTemplate">
+                                                    <div  ng-if="eachResultField.fieldType == 'STRING' && eachResultField.hasEnabled && !eachResultField.isHidden" class="col-md-12">
+                                                        <label for="eachResultField.fieldAPIName"><b>{{ eachResultField.fieldLabelName }}</b></label>
+                                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                                            <div class="slds-col slds-size--4-of-12">
+                                                                <input class="slds-col slds-size--4-of-12 slds-input validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" type="text" ng-model="DecisionTreeresponse[decisionTreeQuestion.Id+'~~'+eachResultField.fieldAPIName]" value="decisionTreeQuestion.ExAM__Subquestion_Label__c"/>
+                                                            </div>
+                                                        </div> 
+                                                    </div>
+                                                    <div  ng-if="eachResultField.fieldType == 'TEXTAREA' && eachResultField.hasEnabled && !eachResultField.isHidden" class="col-md-12">
+                                                        <label for="eachResultField.fieldAPIName"><b>{{ eachResultField.fieldLabelName }}</b></label>
+                                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap" >
+                                                            <div class="slds-col slds-size--4-of-12">
+                                                                <textarea rows="4" cols="50" class="slds-col slds-size--4-of-12 slds-textarea validate{{question.questionTemplate.ExAM__Is_Mandatory__c}}" ng-model="DecisionTreeresponse[decisionTreeQuestion.Id+'~~'+eachResultField.fieldAPIName]" />
+                                                            </div>
+                                                        </div> 
+                                                    </div>
+                                                    <div  ng-if="eachResultField.fieldType == 'PICKLIST' && eachResultField.hasEnabled && !eachResultField.isHidden" class="col-md-12">
+                                                        <label for="eachResultField.fieldAPIName"><b>{{ eachResultField.fieldLabelName }}</b></label>
+                                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                                            <div class="slds-col slds-size--4-of-12">    
+                                                                <select id="sectionTempId" ng-value="section"  class="slds-select" ng-model="DecisionTreeresponse[decisionTreeQuestion.Id+'~~'+eachResultField.fieldAPIName]" ng-options="section as section for section in eachResultField.picklistValues"></select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div  ng-if="eachResultField.fieldType == 'PICTURE' && eachResultField.hasEnabled && !eachResultField.isHidden" class="col-md-12">
+                                                        <label for="eachResultField.fieldAPIName"><b>{{ eachResultField.fieldLabelName }}</b></label>
+                                                        <div style="padding-bottom:15px;" class="slds-grid slds-wrap">
+                                                            <div class="slds-col slds-size--4-of-12">    
+                                                                <input type="file" id="fid" data-file="photo[decisionTreeQuestion.Id]"/>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- end result template fields iteration -->
+                                            </div>
+                                        </div> 
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-modal__footer">
+                                <button ng-if="decisionTreeQuestion.ExAM__Question_Type__c == 'Result' && decisionTreeQuestion.ExAM__Next_Question__c != null " class="slds-button slds-button--neutral slds-button--brand" ng-click="savedecisionTreeQuestion(false, decisionTreeQuestion, 'SAVE AND CONTINUE');">{!$Label.Related_Decision_Tree_Chain_Button}</button>
+                                <button ng-show="previousQuestion != null && previousQuestion[decisionTreeQuestion.Name] != null" class="slds-button slds-button--neutral slds-button--brand" ng-click="previousQuestion(decisionTreeQuestion.Name);"> Previous </button>
+                                <button ng-if="decisionTreeQuestion.ExAM__Question_Type__c != 'Result' " class="slds-button slds-button--neutral slds-button--brand" ng-click="decisionTreeNextQuestion(DecisionTreeresponse[decisionTreeQuestion.Id], decisionTreeQuestion);">Next</button>
+                                <button ng-if="decisionTreeQuestion.ExAM__Question_Type__c == 'Result' " class="slds-button slds-button--neutral slds-button--brand" ng-click="savedecisionTreeQuestion(false, decisionTreeQuestion, 'SAVE');">Continue</button>  
+                                <button class="slds-button slds-button--neutral" ng-click="closeDecisionTree()">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!--End Decision Tree-->
+
+                </div> 
+                <div id="tabpanel2" class="slds-tabs__content slds-hide" role="tabpanel">
+                    <c:AssignmentManagerDetail ></c:AssignmentManagerDetail>
+                </div>
+                <div id="tabpanel3" class="slds-tabs__content slds-hide" role="tabpanel">
+                    <c:AssignmentManagerList ></c:AssignmentManagerList>
+                </div>
+                <div id="tabpanel4" class="slds-tabs__content slds-hide" role="tabpanel">
+                    <c:DataManagement frmLensViewer="false"/>
+                </div>
+            </div>                     
+        </div>
+    </html>
+    <script>
+        function closedialog()  {
+            $('.generalConfig').addClass('slds-modal__close');
+            $('.generalConfig').removeClass('slds-fade-in-open');
+        }
+        function opendialog() {
+            $('.generalConfig').removeClass('slds-modal__close');
+            $('.generalConfig').addClass('slds-fade-in-open');
+        }
+        
+        /*function opencomment() {
+            $('.answercomment').removeClass('slds-modal__close');
+            $('.answercomment').addClass('slds-fade-in-open');
+        }
+        function closecomment() {
+            $('.answercomment').addClass('slds-modal__close');
+            $('.answercomment').removeClass('slds-fade-in-open');
+        }*/
+        
+        var activeComponentId, activeComponentIndex, selectedComponentId, selectedComponentIndex;
+        $('#tabpanel1').addClass('slds-show');
+        $('li.slds-tabs__item').click(function() {
+            $('li.slds-tabs__item').each(function() {
+                if($(this).hasClass('slds-active')) {
+
+                    activeComponentId = $(this).attr('id');
+                    activeComponentIndex = activeComponentId.substring(activeComponentId.length-1, activeComponentId.length);
+                    $(this).removeClass('slds-active');
+                    $('#tabpanel'+activeComponentIndex).removeClass('slds-show');
+                }
+            });
+            selectedComponentId = $(this).attr('id');
+            selectedComponentIndex = selectedComponentId.substring(selectedComponentId.length-1, selectedComponentId.length);
+            $(this).addClass('slds-active');
+            $('#tabpanel'+selectedComponentIndex).addClass('slds-show');
+        });
+        
+        $('li.slds-dropdown__item').click(function() {
+            $('li.slds-dropdown__item').each(function() {
+                if($(this).hasClass('slds-active')) {
+
+                    activeComponentId = $(this).attr('id');
+                    activeComponentIndex = activeComponentId.substring(activeComponentId.length-1, activeComponentId.length);
+                    $(this).removeClass('slds-active');
+                    $('#tabpanel'+activeComponentIndex).removeClass('slds-show');
+                }
+            });
+            selectedComponentId = $(this).attr('id');
+            selectedComponentIndex = selectedComponentId.substring(selectedComponentId.length-1, selectedComponentId.length);
+            $(this).addClass('slds-active');
+            $('#tabpanel'+selectedComponentIndex).addClass('slds-show');
+        });
+        
+        
+        var tempThis ={};
+        $( document ).ready(function() {
+           //using the jquery map highlight plugin:
+           
+           //initialize highlight
+           $('.map').maphilight({strokeColor:'808080',strokeWidth:0,fillColor:'00cd27'});
+           //map clicks
+           $(".tabs area").click(function(){
+               
+               //This block is what creates highlighting by trigger the "alwaysOn", 
+               
+               //var data = $(this).data('maphilight') || {};
+             //  data.alwaysOn = !data.alwaysOn;
+              // $(this).data('maphilight', data).trigger('alwaysOn.maphilight'); 
+               
+               
+               var data = $(this).data('maphilight') || {};
+               data.alwaysOn = true;
+               $(this).data('maphilight', data).trigger('alwaysOn.maphilight');
+               data.alwaysOn = false;
+               
+               if(typeof tempThis === "undefined" && tempThis != $(this)){
+                   tempThis.data('maphilight', data).trigger('alwaysOn.maphilight'); 
+                   
+                   
+               }
+               tempThis =  $(this); 
+                
+               //there is also "neverOn" in the docs, but not sure how to get it to work
+                          
+                     
+               if ($(this).hasClass("current") == false)
+               {
+                   var thisTarget = $(this).attr("href");
+                                                           
+                   $(this).parents(".tabs").find('area.current').removeClass('current');
+                            
+                   $(this).addClass('current');
+                                
+                   $(this).parents(".tabs").nextAll(".tab-content").children(":visible").fadeOut(1, function() {
+                       $(thisTarget).fadeIn("fast");
+                   });
+            
+               }
+               return false; 
+          });   
+        });
+        
+        
+    </script>
+</apex:page>

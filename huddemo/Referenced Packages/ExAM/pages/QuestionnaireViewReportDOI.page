@@ -1,0 +1,2 @@
+<apex:page Controller="ExAM.QuestionnaireFieldsReport" sidebar="false" showHeader="false">
+</apex:page>

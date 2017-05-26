@@ -1,0 +1,929 @@
+<apex:page standardStylesheets="false" sidebar="false" showHeader="false"  id="thePage" docType="html-5.0" controller="HybridHUDViewercontroller"> 
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <c:RemoteTK />
+    <head>
+        <title>Inspection Manager</title>
+        
+        <apex:stylesheet value="{!URLFOR($Resource.OneApp,'icons.css')}"/>
+        <apex:stylesheet value="{!URLFOR($Resource.OneApp,'styles.css')}"/>
+        <apex:stylesheet value="{!URLFOR($Resource.OneApp,'OneStarter.css')}"/>
+        <apex:stylesheet value="{!URLFOR($Resource.jsLibrary,'bootstrap.min.css')}"/>
+        <apex:stylesheet value="{!URLFOR($Resource.jsLibrary,'bootstrap-theme.min.css')}"/>
+        <apex:stylesheet value="{!URLFOR($Resource.jsLibrary,'jquery.dataTables.min.css')}"/>
+        
+        <apex:includeScript value="{!URLFOR($Resource.jsLibrary,'jquery.min.js')}" /> 
+        <apex:includeScript value="{!URLFOR($Resource.jsLibrary,'jquery.dataTables.min.js')}" /> 
+        <apex:includeScript value="{!URLFOR($Resource.jsLibrary,'fastclick.min.js')}" /> 
+        <apex:includeScript value="{!URLFOR($Resource.jsLibrary,'publisher.js')}" />
+         
+        <style type="text/css">
+         
+            .btn-primary{
+                color: #ffffff;
+                background-color: #237db4;
+                border-color: #1b628e;
+                display: inline-block;
+                margin-bottom: 0;
+                font-weight: normal;
+                text-align: center;
+                vertical-align: middle;
+                cursor: pointer;
+                background-image: none;
+                border: 1px solid transparent;
+                white-space: nowrap;
+                padding: 6px 14px;
+                font-size: 14px;
+                line-height: 1.42857143;
+                border-radius: 4px;
+                -webkit-user-select: none;
+            }
+            .sel{
+                -webkit-appearance:menulist-button;
+                display: block;
+                width: 100%;
+                height: 34px;
+                padding: 6px 14px;
+                font-size: 14px;
+                line-height: 1.42857143;
+                color: #000000;
+                background-color: #ffffff;
+                background-image: none;
+                border: 1px solid #cfd0d2;
+                border-radius: 4px;
+                -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+                box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+                -webkit-transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+                transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+            }
+            .flash {
+                    
+                    position:   fixed;
+                    z-index:    1000;
+                    top:        0;
+                    left:       0;
+                    height:     100%;
+                    width:      100%;
+                    background: rgba( 255, 255, 255, .8 )
+                                url('/img/loading.gif')   
+                                50% 50% 
+                                no-repeat;  
+                }
+            .loading{
+                font-size: 19px;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                margin-top: -50px;
+                margin-left: -50px;
+                width: 135px;
+                height: 100px;
+                font-weight: bold;
+                color: black;
+            }     
+        </style>
+    </head>
+    <body>
+    <div id="page" class="hfeed site">
+        <div class="head-container">  
+            <div class="container"> 
+                <div style="background-color:#E6E6E6;border-color:#666666;" id="outermost" >         
+                <div class="sixteen columns">               
+                    <a class="sr-only" href="#content">Skip to main content</a>
+                    <header class="navbar navbar-static-top bs-docs-nav" id="top" role="banner">
+                        <div class="container">
+                            <div class="navbar-header">
+                                <button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".bs-navbar-collapse">
+                                    <span class="sr-only">Toggle navigation</span>
+                                    <span class="icon-bar"></span>
+                                    <span class="icon-bar"></span>
+                                    <span class="icon-bar"></span>
+                                </button>
+                                <h5 class="fl man fw-bold f9 text-color-1" style="font-size: 24px;padding: 18px;" id="header">Inspection Manager</h5>
+                            </div>
+                            <nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
+                                <ul class="nav navbar-nav navbar-right">
+                                </ul>
+                            </nav>
+                            
+                        </div>
+                    </header>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container page-container">      
+        <div class="sixteen columns">       
+            <div class="content">
+                <div class="main-slider-container">
+                    <section class="slider">
+                        <div class="alert alert-success alert-dismissible" role="alert" id="alert" style="display:none;font-size: 18px;text-align: center;">
+                            <button type="button" class="close" data-dismiss="alert" onclick="$j('#alert').toggle();">
+                            <span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                            <div id="alrtMess">overall Status <b>Completed</b></div>
+                        </div>
+                        <div style="background-color:rgba(238, 238, 238, 0.66);border-color:#666666;" id="outermost" >
+                            <div align="left" style="margin-right:3px;margin-left:2px;" id="secquest"> 
+                                <div class="row">
+                                    <apex:form id="frm">
+                                    <div class="sec0" >
+                                    <div class="col-md-8" style="padding-left:4%;" >
+                                        <br/><span class="f4 text-color-1 fw-semibold" >          
+                                                <apex:outputText style="padding-right:23px;padding-top:5px;padding-bottom:5px;font-style:bold;">Inspection Name : </apex:outputText>HUD Inspection Checklist
+                                            </span><br/> 
+                                            <br/>
+                                    </div>
+                                    <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText style="padding-right:23px;padding-top:5px;padding-bottom:5px;font-style:bold;">Inspection Section :</apex:outputText>
+                                        </span>
+                                        <span>  
+                                            <apex:selectList id="sectionlist" value="{!sectionid}" size="1" style="height:34px;" styleclass="sel" onchange="$j('#Itemimg').show();getQuestions(this.value,'false')" >
+                                            <apex:selectOptions value="{!sectionOptionLists}"/> 
+                                            </apex:selectList>
+                                            <br/> 
+                                        </span>
+                                    </div>
+                                     <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText value="Inspection Item :" style="font-style:bold;padding-right:16px;padding-top:5px;padding-bottom:5px"/>
+                                            <img id="Itemimg" src="/img/loading.gif" style="display:none;float:right;" width="16" height="16"/>
+                                        </span>
+                                        <span>  
+                                            <select name="day" id="item" class="sel">
+                                                <option value="None">None</option>
+                                            </select>
+                                            
+                                          <br/> 
+                                        </span>
+                                    </div>
+                                    </div>
+                                    <div class="sec1" style="display:none;">
+                                    <div class="col-md-8" id="audFed" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText value="Fed :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>
+                                        <span>  
+                                        <select id="afedSel"  class="sel selValue">
+                                              <option value="None">None</option>
+                                            </select>  
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                     <div class="col-md-8" id="fed" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <output style="font-style:bold;padding-right:2px;" id="fedlabel">Fed :</output>
+                                        </span>
+                                        <span>  
+                                        <select id="fedSel"  class="sel selValue">
+                                        <option value="None">None</option>
+                                            </select>  
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="col-md-8" id="pha" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText value="PHA :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>
+                                        <span>  
+                                                <select id="phaSel" class="sel selValue">
+                                                <option value="None">None</option>
+                                                </select>    
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    <div class="col-md-8" id="diff" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText id="diffLabel" value="QA to PHA :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                                <select id="diffSel"  class="sel">
+                                                  <option value="None">None</option>
+                                                  <option value="Confirm">Confirm</option>
+                                                  <option value="Agree">Agree</option>
+                                                </select>  
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    </div>
+                                    <div class="col-md-8" id="lnk" style="padding-left:4%;">
+                                        <a onclick="$j('#other,#lnk').toggle();" id="showlnk" style="cursor: pointer;display:none;">Show Other Questions </a>
+                                    </div>
+                                    <div id="other" style="display:none;">
+                                    <div class="col-md-8" style="padding-left:4%;padding-bottom: 1%;">
+                                        <a onclick="$j('#other,#lnk').toggle();" style="cursor: pointer;">Hide Other Questions </a>
+                                    </div>
+                                    <div class="col-md-8" id="diff1" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText value="QA to PHA :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                                <select id="auditDiffSel"  class="sel">
+                                                  <option value="None">None</option>
+                                                  <option value="Confirm">Confirm</option>
+                                                  <option value="Agree">Agree</option>
+                                                </select>  
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText value="Room Location 1 :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                             <select id="room1"  class="sel">
+                                                <option value="None">None</option>
+                                                <option value="Right">Right</option>
+                                                <option value="Center">Center</option>
+                                                <option value="Left">Left</option>
+                                           </select> 
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                           <apex:outputText value="Room Location 2 :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                             <select id="room2"  class="sel">
+                                                <option value="None">None</option>
+                                                <option value="Front">Front</option>
+                                                <option value="Center">Center</option>
+                                                <option value="Rear">Rear</option>
+                                           </select> 
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                     <div id="num" class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                           <apex:outputText value="Floor level :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                             <select id="fLevel"  class="sel">
+                                                 <option value="None">None</option>
+                                             </select>
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                     <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                           <apex:outputText value="Room Code:" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                            <select id="rCode"  class="sel">
+                                                <option value="None">None</option>
+                                                <option value="1 = Room Used for Sleeping">1 = Room Used for Sleeping</option>
+                                                <option value="2 = Dining Room or Dining Area">2 = Dining Room or Dining Area</option>
+                                                <option value="3 = Second Living Room, Family Room, Den, Playroom, TV Room">3 = Second Living Room, Family Room, Den, Playroom, TV Room</option>
+                                                <option value="4 = Entrance Halls, Corridors, Halls, Staircases">4 = Entrance Halls, Corridors, Halls, Staircases</option>
+                                                <option value="5 = Additional Bathroom">5 = Additional Bathroom</option>
+                                                <option value="6 = Other">6 = Other</option>
+                                            </select> 
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                           <apex:outputText value="Other Room :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                            <input type="text" class="form-control iP" id="oRoom" /> 
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText id="noteTitle" value="Inspection Notes :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                           <textarea  class="form-control iP" id="InsDescription"  />   
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    <div class="col-md-8" style="padding-left:4%;">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                           <apex:outputText value="Add picture :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                            <input class="form-control iP" type="file" capture="camera" accept="image/*" id="fileToUpload" onchange="$j('#picCmt').show();"/>  
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    <div class="col-md-8" style="padding-left:4%;display:none;" id="picCmt">
+                                        <span class="f4 text-color-1 fw-semibold">          
+                                            <apex:outputText value="Picture Comments :" style="font-style:bold;padding-right:2px;"/>
+                                        </span>  
+                                        <span>
+                                           <textarea class="form-control iP" id="attachDescription"  />   
+                                              <br/> 
+                                        </span>
+                                    </div>
+                                    
+                                    </div>
+                                    <div class="col-xs-12  col-md-8" style="padding-left: 50px;padding-bottom: 25px;padding-top: 20px;">
+                                        <div id="bkBtn" class="btn-primary" >Back</div>
+                                        <div id="svBtn" class="btn-primary" >Save</div>
+                                        <div  class="btn-primary" id="rSet" >Reset</div>
+                                        <div id="autoBtn" class="btn-primary" style="display:none;">Auto Fill</div>
+                                        <div  class="btn-primary" id="submit" >Submit Inspection</div>
+                                    </div>
+                                    </apex:form>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <div style="background-color:white;height:24px;">
+                    </div>
+                    <div style="background-color:rgba(238, 238, 238, 0.66);border-color:#666666;">
+                        <ol class="breadcrumb" style="background-color:#E6E6E6;border-color:#666666;">
+                            <li><h4 class="fl man fw-bold f9 text-color-1" style="font-size: 24px;padding: 12px;">Answers</h4></li>
+                            <img id="ansImg" src="/img/loading.gif" style="display:none;float:right;" width="16" height="16"/>
+                        </ol>
+                        <div class="table-responsive" style="padding:8px;">
+                            
+                            <table id="example"  class="display table table-striped table-bordered table" cellspacing="0" width="100%" >
+                                <thead>
+                                    <tr>
+                                        <th>Action</th>
+                                        <th>Assessment Response</th>
+                                        <th>PHA </th>
+                                        <th id="H3">QA</th>
+                                        <th id="H4">Fed </th>
+                                        <th>QA to PHA</th>
+                                        <th>Fed to QA</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <div class = "flash" style="display:none;">  
+        <p  class="loading" id="msgBlock"><b>Please Wait...</b></p>
+    </div>
+    </body>     
+     <script>
+        var $j = jQuery.noConflict();
+        var parentId = ''; 
+        //$j('#page').oneStarter('app');
+        var questJsonResponse;
+        var answerList;
+        var answerRecId;
+        var zeroAnswers;
+        var showColumn;
+        var showQAColumn;
+        var showAuditColumn = false;
+        var client = new remotetk.Client();
+        var autoFillVal;
+        var itemIds ='';
+        
+        $j(document).ready(function() {
+            // $j('#example').dataTable();
+            if('{!aManagerId}' != ''){
+                window.oTable = browserInitTable(); 
+                getAnswers('load','0');
+                
+            }else{
+                $j('#alrtMess').empty().append('Error : Please click appropriate link in Assignment Manager reocrd.');
+                $j('#alert').addClass('alert-danger').toggle();
+                $j('.sec0,#svBtn,#rSet,#autoBtn,#submit,#bkBtn').hide();
+            }
+            initLoad();
+            rDiffOptions();
+            
+        });
+        
+        
+        
+        function detailCallback(result){
+            console.log(result);
+        }
+        
+        function initLoad(){
+            if('{!inspectionStatus}' == 'Completed'){
+               $j('#submit,#svBtn,.sec1,#showlnk').hide();
+               $j('#alert').toggle();
+            }
+        }
+        
+        function initView(){
+            if('{!inspectionType}' == 'Inspection'){
+                $j('#header').empty().append('Inspection Viewer');
+               $j('#audFed,#fed,#diff').hide();
+               showColumn = false;
+               showQAColumn = false;
+               autoFillVal = 'phaSel';
+            }
+            if('{!inspectionType}' == 'QA'){
+               $j('#header').empty().append('Inspection QA Viewer');
+               $j('#audFed').hide();
+               $j('#fedlabel').val('QA :');
+               showQAColumn = false;
+               //$j('#fedH').empty().append('QA');
+               $j('span[id*=noteTitle]').empty().append('QA Notes :');
+               autoFillVal = 'fedSel';
+            }
+            if('{!inspectionType}' == 'Audit'){
+               $j('#header').empty().append('Inspection Audit Viewer');
+               $j('#fedlabel').val('QA :');
+               showColumn = true;
+               showQAColumn = true;
+               showAuditColumn = true;
+               $j('span[id*=noteTitle]').empty().append('Audit Notes :');
+               autoFillVal = 'afedSel';
+               $j('span[id*=diffLabel]').empty().append('Fed to QA :');
+               aDiffOptions();
+            }
+            if('{!inspectionType}' == 'DesktopAudit'){
+               $j('#header').empty().append('Inspection Desktop Audit Viewer');
+               showColumn = true;
+               showQAColumn = true;
+               showAuditColumn = true;
+               $j('span[id*=noteTitle]').empty().append('Audit Notes :');
+               $j('span[id*=diffLabel]').empty().append('Fed to QA :');
+               autoFillVal = 'afedSel';
+               $j('#fed,#pha').hide();
+               aDiffOptions();
+            }
+            
+            for(i=0;i<=50;i++){
+                $j('#fLevel').append('<option value="'+i+'">'+i+'</option>');
+                
+            }
+        }
+        
+        $j( "#item" ).change(function() {
+            if( '{!inspectionStatus}' != 'Completed' ){
+                $j('.sec1').show();
+                $j('#showlnk').show();
+            }
+            if($j('#item').val() != 'None'){
+              getAnswers('item',$j('#item').val());
+            }else{
+               getAnswers('section',$j('select[id*=sectionlist]').val());
+               $j('.sec1').hide();
+                $j('#showlnk').hide(); 
+            }
+            selOptions($j('#item').val());
+            
+            
+        });
+        
+        function selOptions(selectedVal){
+            if( questJsonResponse != '' ){
+                $j('#afedSel,#fedSel,#phaSel').empty();
+                $j('#afedSel,#fedSel,#phaSel').append('<option value="">None</option>');
+            
+                for (i in questJsonResponse){
+                    if( String(questJsonResponse[i]["Id"]) == selectedVal ){
+                        var opt = String(questJsonResponse[i]["options"]).split("~");
+                        for (i in opt){
+                            if(i != 'remove'){
+                                $j('#afedSel,#fedSel,#phaSel').append('<option value="'+opt[i]+'">'+opt[i]+'</option>');
+                            }
+                        }
+                    } 
+                }
+            }
+        }
+        
+        function rDiffOptions(){
+            var parJSON;
+            
+            if(showAuditColumn){
+                parJSON = jQuery.parseJSON('{!auditDiffJson}');
+            }else{
+                parJSON = jQuery.parseJSON('{!reasonDiffJson}');
+            }
+            
+            if( parJSON != '' ){
+                $j('#diffSel').empty();
+                $j('#diffSel').append('<option value="">None</option>');
+            
+                for (i in parJSON){
+                    if( String(parJSON[i]['"'+i+'"']) != '' ){
+                        $j('#diffSel').append('<option value="'+String(parJSON[i])+'">'+ String(parJSON[i])+'</option>');
+                     
+                    } 
+                }
+            }
+        }
+        
+        function aDiffOptions(){
+            var parJSON = jQuery.parseJSON('{!reasonDiffJson}');
+            if( parJSON != '' ){
+                $j('#auditDiffSel').empty();
+                $j('#auditDiffSel').append('<option value="">None</option>');
+            
+                for (i in parJSON){
+                    if( String(parJSON[i]['"'+i+'"']) != '' ){
+                        $j('#auditDiffSel').append('<option value="'+String(parJSON[i])+'">'+ String(parJSON[i])+'</option>');
+                     
+                    } 
+                }
+            }
+        }
+        
+        function getQuestions(secId,auto){
+            $j('.sec1').hide();
+            var section = $j('select[id*=sectionlist] option:selected').text();
+            if(section == 'Special Amenities' || section == 'Questions to Ask the Tenant' || section == 'Inspection Summary/Comments'){
+                $j('#autoBtn').hide();
+            }else{
+                $j('#autoBtn').show();
+            }
+            itemIds = '';
+            HybridHUDViewercontroller.getQuestions(secId,function(result,event){             
+                if(event.status){
+                    //alert(result);
+                    if(result != ''){
+                        $j('#item').empty();
+                        var parJSON = jQuery.parseJSON(result);
+                        $j('#item').append('<option value="None">None</option>');
+                        for (i in parJSON){
+                            if(String(parJSON[i]["Id"]) != 'undefined' ){
+                                $j('#item').append('<option value="'+parJSON[i]["Id"]+'">'+parJSON[i]["itemLabel"]+'</option>');
+                                if(itemIds != '') itemIds += ', ';
+                                itemIds +=  parJSON[i]["Id"];
+                                
+                            }
+                        }
+                        console.log('itemIds::::::'+itemIds);
+                        $j('#Itemimg').hide();
+                        questJsonResponse = parJSON;
+                        if(auto == 'false'){
+                            getAnswers('section',secId);
+                        }else{
+                            $j('#item').val(selectedItemVal);
+                            selOptions(selectedItemVal);
+                            $j('#fedSel').val(fedResp);
+                            $j('#phaSel').val(phaResp);
+                            $j('#afedSel').val(qaResp);
+                            $j('.sec1').show();
+                        }
+                    }
+                }else{
+                   console.log('getQuestions::::::'+result); 
+                }
+            },{escape: false});
+            
+        }
+        
+        function editAnswer(ansId){
+            console.log('ansId::::::'+ansId);
+            $j('#svBtn').empty().append('Update');
+            if(answerList != ''){
+                for (i in answerList){
+                    if(String(answerList[i]["Id"]) == ansId ){
+                        console.log('answerList[i]::::::'+answerList[i]);
+                        answerRecId = answerList[i]["Id"];
+                        $j('select[id*=sectionlist]').val(answerList[i]["sectionId"]);
+                        $j('select[id*=sectionlist],#item').attr('disabled','true');
+                        $j('select[id*=sectionlist],#item').css({
+                            cursor: 'not-allowed',
+                            background: '#eee',
+                            '-webkit-appearance': 'none'
+                        }); 
+                        selectedItemVal =  answerList[i]["itemId"];
+                        fedResp = answerList[i]["responseFED"];
+                        phaResp = answerList[i]["responsePHA"];
+                        qaResp = answerList[i]["qaDecision"];
+                        getQuestions(answerList[i]["sectionId"],'true');
+                        
+                        if(showAuditColumn == true){
+                            $j('#diffSel').val(answerList[i]["auditResonDiff"]);
+                            $j('#auditDiffSel').val(answerList[i]["reasonForDiff"]);
+                        }else{
+                            $j('#diffSel').val(answerList[i]["reasonForDiff"]);
+                        }
+                        $j('#room1').val(answerList[i]["room1"]);
+                        $j('#room2').val(answerList[i]["room2"]);
+                        $j('#fLevel').val(answerList[i]["fLevel"]);
+                        $j('#oRoom').val(answerList[i]["oRoom"]);
+                        $j('#rCode').val(answerList[i]["rCode"]);
+                        
+                        $j('#showlnk').show();
+                        getAnswers('Item',selectedItemVal);
+                    }
+                }
+            }
+            window.scrollTo(0,0);
+        }
+       
+       
+        $j('#submit').on('touchstart click', function(e){
+            e.stopPropagation(); e.preventDefault();
+            if( zeroAnswers == 'false' ){
+                 HybridHUDViewercontroller.submitInspection('{!aManagerId}',function(result,event){             
+                    if(event.status){
+                        if(result == 'true'){
+                            alert('Inspection Submited Successfully.');
+                            redirect('{!aManagerId}','orgin');
+                        }else{
+                            alert('Inspection Submition Failed.');
+                        }
+                        $j('#ansImg').hide();
+                    }else{
+                       console.log('submitInspection::Error::'+result);
+                       $j('#ansImg').hide(); 
+                    }
+                },{escape: false});
+            }else{
+                alert('Answers not created yet.');
+            } 
+        });
+        
+        function getAnswers(queryFor,id){
+            $j('#ansImg').show();
+            var ans = new Object();
+            ans.getFor = queryFor;
+            ans.Id = id;
+            ans.acctId = '{!acctId}';
+            ans.assignManagerId = '{!aManagerId}';
+            ans.inStatus = '{!inspectionStatus}';
+            
+            var whereCondition = JSON.stringify(ans);
+            console.log('whereCondition::::'+whereCondition);
+            HybridHUDViewercontroller.getAnswers(whereCondition,function(result,event){             
+                if(event.status){
+                    var newresult = $j.parseJSON(result);  
+                    //alert(newresult);
+                    if(newresult != ''){
+                        BuildTopAccounts(newresult);
+                        answerList = newresult;
+                        zeroAnswers = 'false';
+                    }else{
+                        $j('#example').dataTable().fnClearTable();
+                        zeroAnswers = 'true';
+                    }
+                    $j('#ansImg').hide();
+                }else{
+                   console.log('getAnswers::Error::'+result);
+                   $j('#ansImg').hide(); 
+                }
+            },{escape: false}); 
+        }
+        
+        function BuildTopAccounts(result){
+            //jsonResult = result;
+            $j('#example').dataTable().fnClearTable();
+            $j('#example').dataTable().fnAddData(result);
+        } 
+    
+        function browserInitTable (){
+            initView();
+            var showDiff = showColumn;
+            if(showAuditColumn == true){ showDiff = false; }
+            return $j('#example').dataTable({ 
+                "bAutoWidth": true,                                    
+                "aoColumnDefs": [
+                    {"mData":  "Action", "aTargets": [ 0 ],"bSortable": false},
+                    {"mData":  "Name", "aTargets": [ 1 ],"bSortable": true, "type": "natural"},
+                    {"mData":  "responsePHA", "aTargets": [ 2 ],"bSortable": true}, 
+                    {"mData":  "responseFED", "aTargets": [ 3 ],"bSortable": true,"bVisible": showColumn}, 
+                    {"mData":  "qaDecision", "aTargets": [ 4 ],"bSortable": true,"bVisible": showQAColumn},
+                    {"mData":  "reasonForDiff", "aTargets": [ 5 ],"bSortable": true,"bVisible": showColumn},
+                    {"mData":  "auditResonDiff", "aTargets": [ 6 ],"bSortable": true,"bVisible": showAuditColumn},
+                    {"mData":  "createdDt", "aTargets": [ 7 ],"bVisible": false,"bVisible": false}
+                ]  ,
+                "order": [[ 7, "desc" ]],
+                "oLanguage": {
+                    "sEmptyTable": "Answers Not Found."
+                }
+            });
+        }
+        
+        $j('#rSet').on('touchstart click', function(e){
+            e.stopPropagation(); e.preventDefault();
+            reset();
+        });
+        $j('#svBtn').on('touchstart click', function(e){
+            e.stopPropagation(); e.preventDefault();
+            saveAnswer();
+        });
+        $j('#bkBtn').on('touchstart click', function(e){
+            e.stopPropagation(); e.preventDefault();
+            redirect('{!aManagerId}','orgin');
+        });
+        
+        $j('#autoBtn').on('touchstart click', function(e){
+            e.stopPropagation(); e.preventDefault();
+            var autoFill = new Object();
+            autoFill.itemIds = itemIds;
+            autoFill.acctId = '{!acctId}';
+            var autoFillRec = JSON.stringify(autoFill);
+            
+            HybridHUDViewercontroller.autoFillAnswers(autoFillRec,function(result,event){             
+                    if(event.status){
+                        console.log('autoFillAnswers::::'+result);
+                        if(result == 'true'){
+                            alert('AutoFill Answers Submited Successfully.');
+                            reset();
+                        }else{
+                            alert('AutoFill Answers Failed.');
+                            reset();
+                        }
+                        
+                    }else{
+                       console.log('autoFillAnswers::Error::'+result);
+                       
+                    }
+                },{escape: false});
+        });
+       
+        
+        function reset(){
+            getAnswers('load','0');
+            $j(':input').each(function() { return $j(this).val() == ""; });
+            
+            $j('select[id*=sectionlist],#item')
+                .removeAttr('disabled')
+                .attr('style','height:34px');
+                
+            $j('.sec1,#other,#showlnk').hide();
+            
+            $j('#item')
+                .empty()
+                .append('<option value="None">None</option>');
+                
+            $j('select[id*=sectionlist]').val('None');
+            var t = '#attachDescription,#InsDescription,#item,#afedSel,#fedSel,#diffSel,.iP';
+            $j(t).val('');
+            var control = $j("#fileToUpload");
+            control.replaceWith( control = control.clone( true ) );
+            
+            answerRecId = null;
+            $j('#svBtn').empty().append('Save');
+            $j('#lnk').show();
+            $j('#num').removeClass('has-error');
+            $j('#picCmt,#autoBtn').hide();
+            $j('.flash').hide();
+        }
+        
+        function saveAnswer(){
+            /*var value = $j('.ipNum').val();
+            var regex = new RegExp(/^\+?[0-9(),.-]+$/);
+            if( value !='' && !value.match(regex)  ) {
+               
+               alert('Floor Number not valid.');
+                //$j('#fLevel').attr('style','border-color: #a94442;' );
+                $j('#num').addClass('has-error'); 
+            }else{*/
+               upsertAnswer(); 
+            //}
+        }
+        
+        function upsertAnswer(){
+            $j('.flash').show();
+            var ans = new Object();
+            //ans.name = $j('select[id*=sectionlist] option:selected').text()+' - '+$j('#item option:selected').text());
+            ans.item = $j('#item').val();
+            ans.fed = $j('#fedSel').val();
+            ans.pha = $j('#phaSel').val();
+            ans.diff = $j('#diffSel').val();
+            if($j('#room1').val() != '') ans.room1 = $j('#room1').val();
+            if($j('#room2').val() != '') ans.room2 = $j('#room2').val();
+            if($j('#rCode').val() != '') ans.rCode = $j('#rCode').val();
+            if($j('#fLevel').val() != '' && $j('#fLevel').val() != 'None') ans.fLevel = $j('#fLevel').val();
+            if($j('#oRoom').val() != '') ans.oRoom = $j('#oRoom').val();
+            ans.auditSel = $j('#afedSel').val();
+            ans.acctId = '{!acctId}';
+            ans.assignManagerId = '{!aManagerId}';
+            ans.answerId = answerRecId;
+            ans.viewType = '{!inspectionType}';
+            ans.auditResonDiff = $j('#auditDiffSel').val();
+            
+            var answerRec = JSON.stringify(ans);
+            console.log('answerRec:: save::'+answerRec);
+            //alert(answerRec);
+            
+            HybridHUDViewercontroller.saveAnswers(answerRec,function(result,event){             
+                if(event.status){
+                    parentId = result;
+                    uploadFile();
+                }else{
+                   alert(result);
+                   $j('.flash').hide(); 
+                }
+            },{escape: false}); 
+            
+        }
+        
+        function createNotes(parentId){
+            var note = new Object();
+            note.ParentId = parentId;
+            note.Title = '{!inspectionType} Notes';
+            note.Body = $j('#InsDescription').val();
+            
+            //console.log('note::'+JSON.stringify(note));
+            
+            if($j('#InsDescription').val() != ''){ 
+                client.create('Note', note, createCallback, errorCallback);
+            }else{
+                reset();
+            }
+        }
+        
+        function createCallback(result){
+          console.log('Success::'+JSON.stringify(result));
+          reset();
+        }
+        
+        function errorCallback(result){
+          console.log('Error::'+JSON.stringify(result));
+          reset();
+        }
+        
+        function uploadAttachment(filecontent, filename, filetype, parentId) {
+            
+            
+            var attachment         = new Object();
+            attachment.Name        = filename;
+            attachment.IsPrivate   = false;
+            attachment.ContentType = filetype;
+            attachment.Body        = filecontent;
+            attachment.Description = $j('#attachDescription').val();
+            attachment.ParentId    = parentId;
+            
+            var attachRec = JSON.stringify(attachment);
+            console.log('answerRec::'+attachRec);
+            
+            HybridHUDViewercontroller.attachPic(attachRec,function(result,event){             
+                if(event.status){
+                    console.log('result::'+result);
+                    createNotes(parentId);
+                }else{
+                   alert(result);
+                   reset();
+                   $j('.flash').hide(); 
+                }
+            },{escape: false}); 
+            
+            
+        }
+        
+        
+       function uploadFile() {
+            var files = document.getElementById('fileToUpload').files;
+            if (!files.length) {
+              console.log('Please select a file for attchment!');
+              createNotes(parentId);
+              $j('.flash').hide();
+              return;
+            }
+            
+            var file = files[0];
+            
+            var reader = new FileReader();
+            reader.onload = loaded;
+            reader.onerror = errorHandler;
+            reader.readAsDataURL(file);           
+        }
+        
+        function loaded(evt) {
+            var file = document.getElementById('fileToUpload').files[0];
+            var fileContent = String(evt.target.result);
+            fileContent = fileContent.substr(fileContent.indexOf(',') + 1);
+            var attachName = $j('select[id*=sectionlist] option:selected').text()+' - '+$j('#item option:selected').text();
+            
+            uploadAttachment(fileContent, attachName, file.type, parentId);
+            //alert(file.name);   
+        }
+        
+        function errorHandler(evt) {
+            if (evt.target.error.name == 'NotReadableError') {
+                alert('File could not be read');
+                $j('.flash').hide();
+            }
+            else {
+                alert(evt.target.error);
+                $j('.flash').hide();
+            }
+        }
+        function redirect(Id,target){ 
+            
+            if( (typeof sforce != 'undefined') && (sforce != null) ) {
+            
+                sforce.one.navigateToSObject(Id);
+            }
+            else {
+                if(target == 'tab'){
+                    window.open('/'+Id,'_blank');
+                }else{
+                    window.location.href = '/'+Id ;
+                }
+            }
+        }
+   </script>
+</apex:page>

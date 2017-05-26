@@ -1,0 +1,2 @@
+<apex:page controller="ExAM.PublicAssessmentLinkCSVcontroller" readOnly="true" contentType="text/csv#Public Assessment Links.csv" cache="true" action="{!exportPublicAssessment}">{!PArecords}
+</apex:page>

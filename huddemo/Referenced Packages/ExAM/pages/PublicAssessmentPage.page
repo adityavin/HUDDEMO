@@ -1,0 +1,254 @@
+<apex:page controller="ExAM.PublicAssessmentComponentCtrller" tabStyle="ExAM__Main_questionaire__c" applyBodyTag="false" docType="html-5.0">
+
+    <div xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
+        <apex:stylesheet value="{!URLFOR($Resource.ExAM__SLDS052, '/assets/styles/salesforce-lightning-design-system-vf.css')}"/>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+        <script src="{!$Resource.sanitize}"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.8.2/lodash.min.js"></script>
+        <apex:includeScript value="{!URLFOR($Resource.ExAM__CKEditor, '/ckeditor/ckeditor.js')}"/>
+        <script type="text/javascript">
+            var __sfdcSessionId = '{!GETSESSIONID()}';
+        </script>
+        <body>
+            <div class="slds slds-form-element" ng-app="PACompApp" ng-controller="PAComController">
+                <div class="slds-card">
+                    <div class="slds-card__header slds-grid">
+                        <div class="slds-media slds-media--center slds-has-flexi-truncate">
+                            <div class="slds-media__body">
+                                <h2 class="slds-text-heading--medium slds-truncate">Public Assessment Page Configuration Details</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="slds-card__body">
+                         <div class="slds-card__body">
+                            <table class="slds-table slds-table--bordered slds-max-medium-table--stacked-horizontal slds-no-row-hover">
+                                <tbody>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-3 slds-cell-wrap">
+                                              Public Assessment Show Modal Window
+                                        </td>
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--3-of-4 slds-cell-wrap">
+                                            <label class="slds-checkbox">
+                                                <input class="slds-col slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--8-of-12" type="checkbox" name="options" id="modalWindowCBox" ng-model="templateRec.ExAM__Show_Modal_Window__c"/>
+                                                <span class="slds-checkbox--faux"></span>
+                                            </label>
+                                        </td>
+                                    </tr>
+                                    <tr class="slds-hint-parent" ng-show="templateRec.ExAM__Show_Modal_Window__c">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-3 slds-cell-wrap">
+                                            Public Assessment Modal Window Text
+                                        </td>
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--3-of-4 slds-cell-wrap">
+                                            <div class="slds-form-element {{modalText}}">
+                                                <input id="modalWindowTxtBox" class="slds-col slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--8-of-12 slds-input" type="text" placeholder="Enter Modal Window Text" ng-model="templateRec.ExAM__Modal_Window_Text__c"/>
+                                                <span id="errorMsg" class="slds-form-element__help">Please Enter Value</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-3 slds-cell-wrap">
+                                              Hide Section Titles   
+                                        </td>
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--3-of-4 slds-cell-wrap">
+                                            <label class="slds-checkbox">
+                                                <input class="slds-col slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--8-of-12" type="checkbox" name="Hidesection" id="hideSections" ng-model="templateRec.ExAM__Hide_Section_Titles__c"/>
+                                                <span class="slds-checkbox--faux"></span>
+                                            </label>
+                                        </td>
+                                    </tr>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-3 slds-cell-wrap">
+                                              Single Question Mode   
+                                        </td>
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--3-of-4 slds-cell-wrap">
+                                            <label class="slds-checkbox">
+                                                <input class="slds-col slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--8-of-12" type="checkbox" ng-model="templateRec.ExAM__Public_Assessment_Single_Question_Mode__c"/>
+                                                <span class="slds-checkbox--faux"></span>
+                                            </label>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="slds-card__header slds-grid">
+                            <div class="slds-media slds-media--center slds-has-flexi-truncate">
+                                <div class="slds-media__body">
+                                    <h2 class="slds-text-heading--small slds-truncate">CSS Resource</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-card__body">
+                            <table class="slds-table slds-table--bordered slds-max-medium-table--stacked-horizontal slds-no-row-hover">
+                                <tbody>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-4">
+                                              Static Resource Name
+                                        </td>
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--3-of-4">
+                                              <input id="text-input-01" class="slds-col slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--8-of-12 slds-input" type="text" placeholder="Enter Static Resource Name" ng-model="templateRec.ExAM__Static_Resource_Name__c"/>
+                                        </td>
+                                        
+                                    </tr>
+                                    <tr class="slds-hint-parent" ng-repeat="path in filePathList track by $index">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-4">
+                                           File Path{{$index+1}}
+                                        </td>
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--3-of-4">
+                                           <input id="text-input-01"  class="slds-col slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--8-of-12 slds-input" type="text" placeholder="Enter File Path" value="{{path}}" ng-model="filePathList[$index]"/>
+                                           <span class="slds-icon__container slds-icon__container--circle slds-icon-action-delete" ng-click="remove($index);" ng-show="$index > 0" style="padding:4px 4px 4px 4px;">
+                                               <svg aria-hidden="true" class="slds-icon slds-icon--x-small" style="height:12px;">
+                                                   <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#delete')}"> </use>
+                                               </svg>
+                                           </span>
+                                            <span class="slds-icon__container slds-icon__container--circle slds-icon-action-new" ng-show="filePathList.length-1 == $index" ng-click="addNew($index);" style="padding:4px 4px 4px 4px;">
+                                               <svg aria-hidden="true" class="slds-icon slds-icon--x-small" style="height:12px;">
+                                                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Resource.SLDS052, '/assets/icons/action-sprite/svg/symbols.svg#new')}"> </use>
+                                               </svg>
+                                           </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="slds-card__header slds-grid">
+                            <div class="slds-media slds-media--center slds-has-flexi-truncate">
+                                <div class="slds-media__body">
+                                    <h2 class="slds-text-heading--small slds-truncate">Public Assessment Page Header Section</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-card__body">
+                            <table class="slds-table slds-table--bordered slds-max-medium-table--stacked-horizontal slds-no-row-hover">
+                                <tbody>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-4">
+                                            <input type="textarea" class="slds-input" id="editor1" rows="10" cols="80"/> 
+                                        </td>
+                                    </tr>
+                                </tbody>   
+                            </table>
+                        </div>
+                        <div class="slds-card__header slds-grid">
+                            <div class="slds-media slds-media--center slds-has-flexi-truncate">
+                                <div class="slds-media__body">
+                                    <h2 class="slds-text-heading--small slds-truncate">Public Assessment Page Footer Section</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-card__body">
+                            <table class="slds-table slds-table--bordered slds-max-medium-table--stacked-horizontal slds-no-row-hover">
+                                <tbody>
+                                    <tr class="slds-hint-parent">
+                                        <td class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-4">
+                                            <input type="textarea" class="slds-input" id="editor2" rows="10" cols="80"/>
+                                          </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="slds-card__footer slds-grid slds-wrap">
+                        <div class="slds-size--1-of-2 slds-medium-size--1-of-2 slds-large-size--1-of-1">
+                            <center>
+                                <input class="slds-button slds-button--brand" type="button" value="Save" ng-click="saveRecord();"/>
+                                <input class="slds-button slds-button--brand" type="button" value="Cancel" ng-click="cancelRecord();"/>
+                            </center>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>   
+        <script>
+            var app = angular.module('PACompApp',[]);
+            app.controller('PAComController', function($scope) {
+                
+                $scope.modalText = '';
+                $('#errorMsg').hide();
+                $scope.templateRec = {};
+                $scope.filePathList = [];
+                $scope.filePathLength;
+                if('{!JSENCODE(templateRecord)}' != 'null' && '{!JSENCODE(templateRecord)}' != '' ) {
+                    $scope.templateRec = JSON.parse('{!JSENCODE(templateRecord)}');
+                }
+                
+                if(!angular.isUndefined($scope.templateRec) && !angular.isUndefined($scope.templateRec.ExAM__SRFile_Path__c)) {
+                    $scope.filePathList = $scope.templateRec.ExAM__SRFile_Path__c.split("~");
+                    $scope.filePathLength = $scope.filePathList.length-1;
+                }else{
+                    $scope.filePathList.push('');
+                }
+                window.onload = function() { 
+                    CKEDITOR.replace('editor1'); 
+                    CKEDITOR.replace('editor2');
+                    $scope.setHeaderAndFooter();
+                    
+                }
+                $scope.setHeaderAndFooter = function () {
+                    CKEDITOR.instances['editor1'].setData( $scope.templateRec.ExAM__Public_Assessment_Page_Header__c );
+                    CKEDITOR.instances['editor2'].setData( $scope.templateRec.ExAM__Public_Assessment_Page_Footer__c );
+                }
+                $scope.addNew = function(index) {
+                    $scope.filePathList.push('');
+                }
+                
+                $scope.remove = function(index) {
+                    $scope.filePathList.splice(index,1);
+                }
+                
+                $scope.saveRecord = function() {
+                
+                    var fileURL;
+                    var isError = false;
+                    
+                    if($scope.templateRec.ExAM__Show_Modal_Window__c == true && (angular.isUndefined($scope.templateRec.ExAM__Modal_Window_Text__c) || $scope.templateRec.ExAM__Modal_Window_Text__c == null || $scope.templateRec.ExAM__Modal_Window_Text__c == '')) {
+                        $scope.modalText = 'slds-has-error';
+                        $('#errorMsg').show();
+                        isError = true;
+                    }
+                    
+                    if(isError) {
+                        return false;
+                    }
+
+                    if(!angular.isUndefined($scope.filePathList) && $scope.filePathList != 'null' && $scope.filePathList != '') {
+                        for(var i=0; i < $scope.filePathList.length; i++) {
+                            if($scope.filePathList[i] != 'null' && $scope.filePathList[i] != '' ) {
+                                if(i == 0) {
+                                    fileURL = $scope.filePathList[i];
+                                } else {
+                                    fileURL = fileURL+'~'+$scope.filePathList[i];
+                                }
+                            }
+                        }
+                        $scope.templateRec.ExAM__SRFile_Path__c = fileURL;
+                    } else {
+                        $scope.templateRec.ExAM__SRFile_Path__c = '';
+                    }
+                    if($scope.templateRec.ExAM__Show_Modal_Window__c == false) {
+                        $scope.templateRec.ExAM__Modal_Window_Text__c = '';  
+                    }
+                    $scope.templateRec.ExAM__Public_Assessment_Page_Header__c = CKEDITOR.instances['editor1'].getData();
+                    $scope.templateRec.ExAM__Public_Assessment_Page_Footer__c = CKEDITOR.instances['editor2'].getData();
+                    
+                    delete $scope.templateRec.attributes;
+                    console.log(':::::Save ::::$scope.templateRec:::',$scope.templateRec);
+                    ExAM.PublicAssessmentComponentCtrller.savePAConfig(angular.toJson($scope.templateRec), function(result, event) {
+                        if(event.status && result != null && result != '') {
+                            if(result == 'success') {
+                                window.open('/'+$scope.templateRec.Id, '_self');
+                            } 
+                        }
+                    });
+                }
+                
+                $scope.cancelRecord = function() {
+                    window.open('/'+$scope.templateRec.Id, '_self');
+                }
+            });
+        </script>     
+    </div>
+</apex:page>

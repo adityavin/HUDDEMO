@@ -1,0 +1,76 @@
+<apex:page controller="ExAM.ExportAssessmentTemplateController" contentType="application/xml" showHeader="false" sidebar="false" readonly="true" cache="true">
+   <AssessmentTemplateList>
+       <apex:repeat value="{!assTempList}" var="eachAssTemp"> 
+            <AssessmentTemplate Id="{!eachAssTemp.Id}" Name="{!eachAssTemp.Name}">
+                <TemplateName>{!JSINHTMLENCODE(eachAssTemp.ExAM__Template_name__c)}</TemplateName>
+                <Description>{!JSINHTMLENCODE(eachAssTemp.ExAM__Description__c)}</Description>
+                <PublishPlace>{!eachAssTemp.ExAM__PublishPlace__c}</PublishPlace>
+                <TemplateFlag>{!eachAssTemp.ExAM__TemplateFlag__c}</TemplateFlag>
+                <ExternalTemplateId>{!JSINHTMLENCODE(eachAssTemp.ExAM__Template_External_Id__c)}</ExternalTemplateId>
+                <AvailableinPortal>{!eachAssTemp.ExAM__Available_in_Portal__c}</AvailableinPortal>
+                <AssessmentCompletedURL>{!JSINHTMLENCODE(eachAssTemp.ExAM__Assessment_Completed_URL__c)}</AssessmentCompletedURL>
+                <ScoreBySectionWeight>{!eachAssTemp.ExAM__Score_By_Section_Weight__c}</ScoreBySectionWeight>
+                <WeightTemplate>{!eachAssTemp.ExAM__Weight_Template__c}</WeightTemplate>
+                <PublicAssessmentPageFooter>{!JSINHTMLENCODE(eachAssTemp.ExAM__Public_Assessment_Page_Footer__c)}</PublicAssessmentPageFooter>
+                <PublicAssessmentPageHeader>{!JSINHTMLENCODE(eachAssTemp.ExAM__Public_Assessment_Page_Header__c)}</PublicAssessmentPageHeader>
+                <ShowImageUploadIcon>{!eachAssTemp.ExAM__Show_Image_Upload_Icon__c}</ShowImageUploadIcon>
+                <ShowNotesIcon>{!eachAssTemp.ExAM__Show_Notes_Icon__c}</ShowNotesIcon>
+                <ShowRefreshIcon>{!eachAssTemp.ExAM__Show_Refresh_Icon__c}</ShowRefreshIcon>
+                <Customcssurl>{!JSINHTMLENCODE(eachAssTemp.ExAM__URL__c)}</Customcssurl>
+                <ModalWindowText>{!JSINHTMLENCODE(eachAssTemp.ExAM__Modal_Window_Text__c)}</ModalWindowText>
+                <ShowModalWindow> {!eachAssTemp.ExAM__Show_Modal_Window__c}</ShowModalWindow>
+                <DecisionTreeResultPage> {!JSINHTMLENCODE(eachAssTemp.ExAM__Decision_Tree__c)}</DecisionTreeResultPage>
+                <GoogleAnalyticsScript>{!JSINHTMLENCODE(eachAssTemp.ExAM__Google_Analytics_Script__c)}</GoogleAnalyticsScript>
+                <ShowQuestionNumber>{!eachAssTemp.ExAM__Show_Question_Number__c}</ShowQuestionNumber>
+                <StaticResourceName>{!eachAssTemp.ExAM__Static_Resource_Name__c}</StaticResourceName>
+                <HideSectionTitles>{!eachAssTemp.ExAM__Hide_Section_Titles__c}</HideSectionTitles>
+                <FilePath>{!JSINHTMLENCODE(eachAssTemp.ExAM__SRFile_Path__c)}</FilePath>
+                <PublicAssessmentSingleQuestionMode>{!eachAssTemp.ExAM__Public_Assessment_Single_Question_Mode__c}</PublicAssessmentSingleQuestionMode>
+                <SectionTemplateList>
+                    <apex:repeat value="{!assIdAndSecTempMap[eachAssTemp]}" var="eachSection" > 
+                        <SectionTemplate Id="{!eachSection.Id}" Name="{!eachSection.Name}">
+                            <SectionName>{!JSINHTMLENCODE(eachSection.Section_label__c)}</SectionName>
+                            <OrderNo>{!eachSection.Order_No__c}</OrderNo>
+                            <SectionDescription>{!JSINHTMLENCODE(eachSection.Section_Description__c)} </SectionDescription>
+                            <SectionWeight>{!eachSection.Section_Weight__c}</SectionWeight>
+                            <MasterQuestionnaireSection>{!eachSection.Questionnaire_Section__c}</MasterQuestionnaireSection>
+                            <NoofQuestionsSection>{!eachSection.No_of_Questions_Section__c}</NoofQuestionsSection>
+                            <NoofresponsePerSectionPerUser>{!eachSection.No_of_response_per_section_per_user__c}</NoofresponsePerSectionPerUser>
+                            <ExternalSectionId>{!JSINHTMLENCODE(eachSection.Section_External_Id__c)}</ExternalSectionId>
+                            <Subsectionlabel>{!JSINHTMLENCODE(eachSection.Subsectionlabel__c)}</Subsectionlabel>
+                            <SuperSection>{!JSINHTMLENCODE(eachSection.SuperSection__c)}</SuperSection>
+                            <Status>{!JSINHTMLENCODE(eachSection.status__c)}</Status>
+                            <QuestionTemplateList>
+                                <apex:repeat value="{!secIdAndQuestempMap[eachSection]}" var="eachQues">
+                                    <QuestionTemplate Id="{!eachQues.Id}" Name="{!eachQues.Name}">
+                                        <QuestionLabel>{!JSINHTMLENCODE(eachQues.Question_Label__c)}</QuestionLabel>
+                                        <HelpText>{!JSINHTMLENCODE(eachQues.HelpText__c)}</HelpText>
+                                        <QuestionOrderNo>{!eachQues.Question_Order_No__c}</QuestionOrderNo>
+                                        <QuestionType>{!eachQues.Question_Type__c}</QuestionType>
+                                        <SubQuestionLabel>{!JSINHTMLENCODE(eachQues.Subquestion_Label__c)}</SubQuestionLabel>
+                                        <NextQuestion>{!JSINHTMLENCODE(eachQues.Next_Question__c)}</NextQuestion>
+                                        <QuestionWeight>{!eachQues.Weight_Of_Question__c}</QuestionWeight>
+                                        <WeightofAnswer>{!eachQues.Weight_of_Answer__c}</WeightofAnswer>
+                                        <SubSectionlabel>{!JSINHTMLENCODE(eachQues.SubSection_label__c)}</SubSectionlabel>
+                                        <MasterSection>{!eachQues.Section_Question__c}</MasterSection>
+                                        <CountQuestions>{!eachQues.Count_Questions__c}</CountQuestions>
+                                        <CountofResponses>{!eachQues.Count_of_Responses__c}</CountofResponses>
+                                        <ExternalQuestionId>{!JSINHTMLENCODE(eachQues.Question_External_Id__c)}</ExternalQuestionId>
+                                        <IsMandatory>{!eachQues.Is_Mandatory__c}</IsMandatory>
+                                        <DoNotCreateAnswer>{!eachQues.Do_Not_Create_Answer__c}</DoNotCreateAnswer>
+                                        <FocusCategory>{!JSINHTMLENCODE(eachQues.Focus_category__c)}</FocusCategory>
+                                        <DecisionTree>{!JSINHTMLENCODE(eachQues.Decision_Tree__c)}</DecisionTree>
+                                        <FieldLength>{!eachQues.Field_Length__c}</FieldLength>
+                                        <HasPicture>{!eachQues.Has_Picture__c}</HasPicture> 
+                                        <IsDependent>{!eachQues.Is_Dependent__c}</IsDependent> 
+                                        <KnowledgeArticleLink>{!JSINHTMLENCODE(eachQues.Knowledge_Article_Link__c)}</KnowledgeArticleLink>                                    
+                                    </QuestionTemplate>
+                                </apex:repeat>
+                           </QuestionTemplateList>
+                        </SectionTemplate>
+                    </apex:repeat>
+                </SectionTemplateList>
+            </AssessmentTemplate>
+        </apex:repeat>
+    </AssessmentTemplateList>
+</apex:page>

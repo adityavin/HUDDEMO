@@ -1,0 +1,35 @@
+<apex:page controller="HUDXMLUploadController">
+    <apex:pageMessages escape="False"/>
+    <apex:includeScript value="{!URLFOR($Resource.jsLibrary,'jquery.min.js')}" /> 
+    <style type="text/css">
+         
+            .flash {
+                    position:   fixed;
+                    z-index:    1000;
+                    top:        0;
+                    left:       0;
+                    height:     100%;
+                    width:      100%;
+                    background: rgba( 255, 255, 255, .8 )  
+                                50% 50% 
+                                no-repeat;  
+                } 
+        </style>
+    <apex:form >
+         <apex:pageBlock title="Upload a File">
+             <apex:pageBlockButtons location="bottom">
+                 <apex:commandButton value="Upload" action="{!uploadxml}" onclick="$('.flash').show();"/>
+             </apex:pageBlockButtons>
+             <apex:pageBlockSection >
+                 <apex:pageBlockSectionItem >
+                     <apex:outputLabel value="File" for="file">
+                     </apex:outputLabel>
+                     <apex:InputFile value="{!attach.Body}" id="file" accept="text/xml" />   
+                 </apex:pageBlockSectionItem>
+             </apex:pageBlockSection>
+         </apex:pageBlock>
+         <div class = "flash" style="display:none">  
+            <p  style="position: fixed; padding-top: 25%;font-weight: bold;color: black;padding-left: 46%;font-size: 19px;" id="msgBlock"><b>Please Wait...</b></p>
+        </div>
+     </apex:form>
+</apex:page>

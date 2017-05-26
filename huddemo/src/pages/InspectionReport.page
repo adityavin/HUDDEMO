@@ -1,0 +1,448 @@
+<apex:page sidebar="false" showHeader="false" title="Inspection Report" id="InspectionReport" language="en" applyHtmlTag="true">
+
+    <head>
+        <meta charset="utf-8"></meta>
+        <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width"></meta>
+        <apex:stylesheet value="{!URLFOR($Resource.InspectionReport ,'www/lib/exam/css/bootstrap.min.css')}"/>
+        <apex:stylesheet value="{!URLFOR($Resource.InspectionReport ,'www/lib/exam/css/main.min.css')}"/>
+        <apex:stylesheet value="{!URLFOR($Resource.InspectionReport ,'www/lib/exam/css/font-awesome.min.css')}"/>
+
+    </head>
+
+    <div ng-app="InspectionReport">
+        <div ng-controller="inspectionCtrl">
+            <div ng-show="spinnerOn" class="maskDiv">
+                <div class="large spinner">
+                    <div>Loading…</div>
+                </div>
+            </div>
+            <button ng-click="savePdf()" class="btn">Email PDF Report for
+                {{ inspection.accountInfo.Name }}</button>
+
+            <div id="inspectionReportPdf" ng-class="{ 'pdf': creatingPdf}">
+
+                <div role="form">
+
+                    <div id="page1" class="page1" ng-show="">
+                        <div id="inspectionHeader" class="row">
+                            <div class="col-xs-12">
+                                <h3 style="font-family:arial;">Inspection Report:
+                                    {{ inspection.accountInfo.Name }},
+                                    {{ inspection.accountInfo.Unit_City__c }},
+                                    {{ inspection.accountInfo.Unit_ST__c }}
+                                </h3>
+                            </div>
+                        </div>
+                        <div class="row" ng-if="applications.length == 0">
+                            <div class="col-xs-12 col-sm-4">
+                                <h4>No report info</h4>
+                            </div>
+                        </div>
+                        <!-- /////////////////////inspection Summary///////////////////// -->
+                        <div id="inpsectionSummary" class="row" if="">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="5">
+                                                Inspection Summary
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                Responsibility
+                                            </td>
+                                            <td>
+                                                Fails - Life Threatening
+                                            </td>
+                                            <td>
+                                                Fails - Emergency
+                                            </td>
+                                            <td>
+                                                Fails - Non-Life Threatening
+                                            </td>
+                                            <td>
+                                                Pass with Comment
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Owner</td>
+                                            <td>{{ (inspection.responses | filter:priorityOwnerFailures).length }}</td>
+                                            <td>{{ (inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Fail', LTE__c : 'Emergency', Responsibility_of_Repair__c : 'Owner'}).length }}</td>
+                                            <td>{{ (inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Fail', LTE__c : 'NLT', Responsibility_of_Repair__c : 'Owner'}).length }}</td>
+                                            <td>{{ (inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Pass', Responsibility_of_Repair__c : 'Owner'}).length }}</td>
+
+                                        </tr>
+                                        <tr>
+                                            <td>Tenant</td>
+                                            <td>{{ (inspection.responses | filter:priorityTenantFailures).length }}</td>
+                                            <td>{{ (inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Fail', LTE__c : 'Emergency', Responsibility_of_Repair__c : 'Tenant'}).length }}</td>
+                                            <td>{{ (inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Fail', LTE__c : 'NLT', Responsibility_of_Repair__c : 'Tenant'}).length }}</td>
+                                            <td>{{ (inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Pass', Responsibility_of_Repair__c : 'Tenant'}).length }}</td>
+
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- /////////////////////unit information///////////////////// -->
+                        <div id="inspectionUnit" class="row" if="inspection.length != 0">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="2">
+                                                Unit Information
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="table-label">Account Name</td>
+                                            <td>{{ inspection.accountInfo.Name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Unit City</td>
+                                            <td>{{ inspection.accountInfo.Unit_City__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Unit County</td>
+                                            <td>{{ inspection.accountInfo.Unit_County__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Unit State</td>
+                                            <td>{{ inspection.accountInfo.Unit_ST__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Unit Zip</td>
+                                            <td>{{ inspection.accountInfo.Unit_Zip__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Year Built</td>
+                                            <td>{{ inspection.accountInfo.Year_Built__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Housing Type</td>
+                                            <td>{{ inspection.accountInfo.Housing_Type__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Other Housing Type Comments</td>
+                                            <td>{{ inspection.accountInfo.Other_Housing_Type_Comments__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Special Housing Type</td>
+                                            <td>{{ inspection.accountInfo.Special_Housing_Type__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Lead Free Certificate</td>
+                                            <td>{{ inspection.accountInfo.Lead_Free_Certificate__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">General Unit Comments</td>
+                                            <td>{{ inspection.accountInfo.General_Unit_Comments__c }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ///////////////////// unit qualifications///////////////////// -->
+                    <div id="page2" class="page">
+                        <div id="inspectionHeader" class="row">
+                            <div class="col-xs-12"></div>
+                        </div>
+                        <div id="inspectionQualifications" class="row" if="applications.length != 0">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="2">
+                                                Unit Qualifications
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="table-label">Unit Size</td>
+                                            <td>{{ inspection.accountInfo.Unit_Size__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Number of Sleeping Rooms</td>
+                                            <td>{{ inspection.accountInfo.Number_of_Sleeping_Rooms__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Rooms Tenant is Using for Sleeping</td>
+                                            <td>{{ inspection.accountInfo.Rooms_Tenant_is_Using_for_Sleeping__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Living Room Present</td>
+                                            <td>{{ inspection.accountInfo.Living_Room_Present__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Kitchen Present</td>
+                                            <td>{{ inspection.accountInfo.Kitchen_Present__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Bathroom Present</td>
+                                            <td>{{ inspection.accountInfo.Bathroom_Present__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Number of Full Bathrooms</td>
+                                            <td>{{ inspection.accountInfo.Number_of_Full_Bathrooms__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Number of Half Bathrooms</td>
+                                            <td>{{ inspection.accountInfo.Number_of_Half_Bathrooms__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Separate Entrance</td>
+                                            <td>{{ inspection.accountInfo.Separate_Entrance__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Minimal SRO Space Requirement Met</td>
+                                            <td>{{ inspection.accountInfo.SRO_Space_Requirement__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Unit Qualification Comments</td>
+                                            <td>{{ inspection.accountInfo.Unit_Qualification_Comments__c }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- /////////////////////inspector information///////////////////// -->
+                    <div id="page3" class="page">
+                        <div id="inspectionHeader" class="row">
+                            <div class="col-xs-12"></div>
+                        </div>
+                        <div id="inspectionInspector" class="row" if="applications.length != 0">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="2">
+                                                Inspector Information
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="table-label">Inspector (Account Owner)</td>
+                                            <td>{{ inspection.accountInfo.Owner.Name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Parent Account</td>
+                                            <td>{{ inspection.accountInfo.Parent.Name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">PHA Code</td>
+                                            <td>{{ inspection.accountInfo.PHA_Code__c }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- /////////////////////Management Agent Information/Inspection information///////////////////// -->
+                        <div id="inspectionAgent" class="row" if="applications.length != 0">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="2">
+                                                Management Agent Information
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="table-label">Management Agent Email Address</td>
+                                            <td class="table-data">{{ inspection.accountInfo.Agent_Email_Address__c }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="row" id="inspectionInfo">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="2">
+                                                Inspection Information
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="table-label">Active</td>
+                                            <td>{{ inspection.mainAm.ExAM__Status__c }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Scheduled By (Created By)</td>
+                                            <td>{{ inspection.mainAm.CreatedBy.Name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Last Modified By</td>
+                                            <td>{{ inspection.mainAm.LastModifiedBy.Name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Description</td>
+                                            <td>{{ inspection.accountInfo.Comments__c }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- /////////////////////High Priority Failures///////////////////// -->
+                    <div id="page4">
+                        <div id="inspectionHeader" class="row">
+                            <div class="col-xs-12"></div>
+                        </div>
+                        <div class="inspectionFail row" ng-repeat="failures in inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Fail'} as failCount">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="2">
+                                                Required Repair
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="2" class="table-label">
+                                                <img src="{{failures.attachment}}"/>
+                                            </td>
+
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Category</td>
+                                            <td>{{ failures.UPCS_V_Pass_or_Fail__c}}
+                                                -
+                                                {{ failures.category}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Area</td>
+                                            <td>{{ failures.Section_Name__c}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Location</td>
+                                            <td>{{ failures.Location__c}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Floor</td>
+                                            <td>{{ failures.Floor_Number__c}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Item</td>
+                                            <td>{{ failures.ExAM__Question_Label__c}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Description</td>
+                                            <td>{{ failures.ExAM__Comment__c}}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Healthy Homes #</td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="table-label">Responsibility</td>
+                                            <td>{{ failures.Responsibility_of_Repair__c}}</td>
+                                        </tr>
+
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                    <!-- /////////////////////Optional Repairs -->
+                    <div id="page5">
+                      <div id="inspectionHeader" class="row">
+                          <div class="col-xs-12"></div>
+                      </div>
+                        <div class="row" if="applications.length != 0">
+                            <div class="col-xs-12  table-wrap">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <td colspan="6">
+                                                Optional Repairs
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                Category
+                                            </td>
+                                            <td>
+                                                Area
+                                            </td>
+                                            <td>
+                                                Location
+                                            </td>
+                                            <td>
+                                                Item
+                                            </td>
+                                            <td>
+                                                Description
+                                            </td>
+                                            <td>
+                                                Responsibility
+                                            </td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr ng-repeat="passes in inspection.responses | filter:{UPCS_V_Pass_or_Fail__c : 'Pass'}">
+                                            <td>{{ passes.UPCS_V_Pass_or_Fail__c}}
+                                                -
+                                                {{ passes.Defect_Level__c}}</td>
+                                            <td>{{ passes.Section_Name__c}}</td>
+                                            <td>{{ passes.Location__c}}</td>
+                                            <td>{{ passes.ExAM__Question_Label__c }}</td>
+                                            <td>{{ passes.ExAM__Comment__c}}</td>
+                                            <td>{{ passes.Responsibility_of_Repair__c}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" ng-model="amId" ng-init="amId='{!$CurrentPage.parameters.amid}'"></input>
+                <input type="hidden" ng-model="sessionId" ng-init="sessionId='{!$Api.Session_ID}'"></input>
+
+            </div>
+            <button ng-click="savePdf()" class="btn">Email PDF Report for
+                {{ inspection.accountInfo.Name }}</button>
+
+        </div>
+    </div>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/angular.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/select-tpls.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/js/app.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/js/controllers.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/js/services.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/js/directives.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/angular-scroll.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/ui-bootstrap-tpls-2.0.1.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/angular-base64-upload.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/Blob.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/FileSaver.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/angular-file-saver.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/jquery.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/angular-base64.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/html2canvas.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/jspdf.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/saveHtmlToPdf.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.InspectionReport ,'www/lib/angular/vfs_fonts.js')}"/>
+
+</apex:page>

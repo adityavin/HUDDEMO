@@ -1,0 +1,177 @@
+<apex:page controller="ExAM.UploadAnswerOptionImagesController">
+    <c:remoetk ></c:remoetk>
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+        <script type="text/javascript">
+            var __sfdcSessionId = '{!GETSESSIONID()}';
+        </script>
+        
+        <script src="../../soap/ajax/35.0/connection.js" type="text/javascript"></script>
+        <script src="../../soap/ajax/35.0/apex.js" type="text/javascript"></script>
+        <head>
+            <title>Admin Configuration</title>
+            <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
+            <apex:stylesheet value="{!URLFOR($Resource.ExAM__SLDS052, '/assets/styles/salesforce-lightning-design-system-vf.css')}" />
+        </head>
+        <body>
+            <div class="slds" ng-app="UploadAnswerImageApp" ng-controller="UploadAnswerImageCtrl">
+                <div class="slds-notify_container" ng-show ="successFlag">
+                    <div class="slds-notify slds-notify--alert slds-theme--success slds-theme--alert-texture" role="alert" >
+                        <h2>Successfully Upload.</h2>
+                    </div>
+                </div>
+                <form class="slds-form">
+                    <div class="slds-card slds-m-top--x-small slds-m-bottom--x-large">
+                        <div class="slds-card__header slds-grid">
+                            <div class="slds-media slds-media--center slds-has-flexi-truncate">
+                                <div class="slds-media__body">
+                                    <h2 class="slds-text-heading--small slds-truncate" style="font-size: x-large;font-weight: 300;">Upload Images</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-card__body" style="background-color:white;">
+                            <div class="slds-form-element__help errorSelect" ng-show ="ErrorFlag" style="color:red;font-size:15px;padding-left:30px;"> Please choose a valid Image File </div>
+                            <div ng-repeat="option in answerOption"  class="slds-grid slds-wrap slds-p-around--small" style="padding-left:30px;">
+                                <label class="slds-form-element__label" for="option" ng-model="option.optionNum" style="font-size:15px">{{ option.optionNum }}</label> &nbsp; &nbsp;
+                                <input type="file" id="fid{{option}}" style="font-size: medium;" data-file="option.optionImage" accept="image/*"/>
+                            </div>
+                        </div>  
+                        <div class="slds-card__footer" style="background-color:white;padding-left: 100px;">
+                            <button class="slds-button slds-button--neutral" type="button" ng-click="uploadImage()" style="background-color: #0070D2;color:white;">Upload</button>
+                            <button class="slds-button slds-button--neutral" type="button" ng-click="uploadCancel()" style="background-color: #0070D2;color:white;">Cancel</button>
+                        </div>  
+                    </div>
+                </form>
+            </div>    
+        </body>
+        <script>
+        
+            var uploadAnsImageApp = angular.module('UploadAnswerImageApp', []);
+            
+            uploadAnsImageApp.directive('file', function() {
+                return {
+                    scope: {
+                        file: '='
+                    },
+                    link: function(scope, el, attrs){
+                        el.bind('change', function(event){
+                            var files = event.target.files;
+                            var file = files[0];
+                            
+                            console.log('::::File::::::',file);
+                            
+                            var reader = new FileReader();
+                            reader.onload = loaded;
+                            reader.onerror = errorHandler;
+                            reader.readAsDataURL(file);
+                            
+                            function loaded(evt){
+                                scope.file = {};
+                                var fileContent = String(evt.target.result);
+                                fileContent = fileContent.substr(fileContent.indexOf(',') + 1);
+                                
+                                scope.file.resultbody = fileContent ;
+                                scope.file.name = file ? file.name : undefined;
+                                scope.file.contenttype = file ? file.type : undefined;
+                                
+                                scope.$apply(); 
+                            }
+                            
+                            function errorHandler(evt) {
+                                if (evt.target.error.name == 'NotReadableError') {
+                                    alert('File could not be read');
+                                }
+                                else {
+                                    alert(evt.target.error);
+                                }
+                            }
+                            
+                        });
+                    }
+                };
+            });
+                
+            uploadAnsImageApp.controller('UploadAnswerImageCtrl',function($scope){
+            
+                var remoteTk = new remotetk.Client();
+                var pid = "{!$CurrentPage.parameters.quesTempId}";
+                var attachmentQuery = "SELECT Id,Name,Body,ContentType FROM Attachment WHERE ParentId = '"+pid +"'";
+                var attachNameAndId = {};
+                
+                $scope.ErrorFlag = false;
+                $scope.successFlag = false;
+                $scope.optionCount = '{!NoOfOptions}';
+                $scope.answerOption = [];
+                $scope.attachmentList =[];
+                
+                
+                for(var i=1; i <= $scope.optionCount; i++) {
+                    $scope.answerOption.push({'optionNum':i,'optionImage':''});
+                }
+                
+                remoteTk.query(attachmentQuery,function(success) {
+                
+                       $scope.attachmentList = success.records;
+                       if ($scope.attachmentList != null) {
+                            for (i = 0; i < $scope.attachmentList.length; i++) {
+                                attachNameAndId[$scope.attachmentList[i].Name] = $scope.attachmentList[i].Id;
+                            }
+                        }
+                        $scope.$apply();
+                    },function(error) {
+                        console.log('::::::::::::error:::;;',error);
+                });
+
+                $scope.uploadImage = function() {
+                    
+                    var attObList = [];
+                    for(var i=0; i < $scope.answerOption.length; i++) {
+                        var attachmentOb = new sforce.SObject("Attachment");
+                         
+                        if($scope.answerOption[i].optionImage.contenttype=='image/jpeg' || $scope.answerOption[i].optionImage.contenttype=='image/png' || $scope.answerOption[i].optionImage.contenttype=='image/gif' || $scope.answerOption[i].optionImage.contenttype=='image/jpg' && $scope.answerOption[i].optionImage != '' ){
+                            
+                            if(attachNameAndId[$scope.answerOption[i].optionNum]) {
+                                attachmentOb.Id = attachNameAndId[$scope.answerOption[i].optionNum];
+                                attachmentOb.Name = $scope.answerOption[i].optionNum;
+                                attachmentOb.Body = $scope.answerOption[i].optionImage.resultbody;
+                                attachmentOb.ContentType = $scope.answerOption[i].optionImage.contenttype;
+                                attachmentOb.ParentId = pid;
+                            } else {
+                                attachmentOb.Name = $scope.answerOption[i].optionNum;
+                                attachmentOb.Body = $scope.answerOption[i].optionImage.resultbody;
+                                attachmentOb.ContentType = $scope.answerOption[i].optionImage.contenttype;
+                                attachmentOb.ParentId = pid; 
+                            }
+                            attObList.push(attachmentOb);
+                            $scope.ErrorFlag = false;
+                            
+                        } else {
+                            if(($scope.answerOption[i].optionImage.resultbody != '' && $scope.answerOption[i].optionImage.contenttype == '')) {
+                                $scope.ErrorFlag = true;
+                            } else if($scope.answerOption[i].optionImage != ''){
+                                $scope.ErrorFlag = true;
+                            }
+                        }
+                    }
+
+                    if( attObList.length > 0 ) {
+                        var att_result = sforce.connection.upsert('Id', attObList);
+                        if (att_result != null && att_result.length > 0) {
+                             if (att_result[0].success == 'true') {
+                                 $scope.successFlag = true;
+                                 window.location =  "{!LEFT($CurrentPage.URL,FIND('/',$CurrentPage.URL,9))}{!$CurrentPage.parameters.quesTempId}";
+                             }
+                         }
+                    }
+                }
+                
+                $scope.uploadCancel = function() {
+
+                    window.location =  "{!LEFT($CurrentPage.URL,FIND('/',$CurrentPage.URL,9))}{!$CurrentPage.parameters.quesTempId}";
+                }
+            });
+            
+        </script>
+    </html>
+</apex:page>
