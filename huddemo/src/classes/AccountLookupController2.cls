@@ -8,6 +8,7 @@ public with sharing class AccountLookupController2 {
     public String accHiddenFieldId{get; set;}
     
       public AccountLookupController2(ApexPages.StandardController controller) {  
+      // GIT HUB Test
       //public AccountLookup(){
          error = false;
          //accObj = (Account)controller.getRecord();
